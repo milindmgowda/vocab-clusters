@@ -1440,3 +1440,217 @@ input:checked + .slider:before {
   to { transform: translateY(0); }
 }
 
+/* Synonyms Autocomplete Dropdown List */
+.synonyms-autocomplete {
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 110;
+}
+
+.synonyms-autocomplete-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--foreground);
+  transition: background-color 0.15s;
+  border-bottom: 1px solid var(--border);
+}
+
+.synonyms-autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.synonyms-autocomplete-item:hover,
+.synonyms-autocomplete-item.active {
+  background-color: var(--accents-1);
+}
+
+/* Game Mode Board Layout */
+.game-play-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.2fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.game-panel-card {
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+}
+
+.game-panel-card h4 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: var(--foreground);
+}
+
+.panel-subtitle {
+  font-size: 12px;
+  color: var(--accents-4);
+  margin: 0 0 16px 0;
+}
+
+/* Word Pool & Workspace */
+.game-word-pool-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: start;
+  flex: 1;
+}
+
+.game-guess-workspace {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 180px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: start;
+  align-items: start;
+  flex: 1;
+  background-color: var(--accents-1);
+  transition: all 0.2s ease;
+}
+
+.empty-workspace-state {
+  font-size: 12px;
+  color: var(--accents-3);
+  text-align: center;
+  margin: auto;
+  max-width: 220px;
+  line-height: 1.4;
+}
+
+.game-word-card {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.game-word-card:hover {
+  border-color: var(--border-hover);
+  background-color: var(--accents-1);
+}
+
+.game-word-card.selected {
+  background-color: rgba(168, 85, 247, 0.08) !important;
+  color: #a855f7 !important;
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.15);
+  transform: scale(1.05);
+}
+
+.game-word-card.mismatched {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  animation: wrong-wobble 0.3s ease;
+}
+
+/* Found Clusters */
+.game-found-clusters-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 440px;
+  flex: 1;
+}
+
+.found-cluster-card {
+  padding: 12px 16px;
+  background-color: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: success-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.found-cluster-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #10b981;
+  letter-spacing: 0.05em;
+}
+
+.found-cluster-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Animations */
+@keyframes wrong-wobble {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-4px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes success-pop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.workspace-shake {
+  animation: wrong-wobble 0.3s ease;
+  border-color: #ef4444 !important;
+}
+
+.workspace-success {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+}
+
+/* Mobile responsive stacked game views */
+@media (max-width: 900px) {
+  .game-play-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .game-panel-card {
+    min-height: auto;
+  }
+  
+  .game-controls-bar {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  
+  .game-controls-bar button {
+    width: 100%;
+  }
+}
+

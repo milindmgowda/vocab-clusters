@@ -38,6 +38,14 @@ const state = {
     studyModeBlurred: true, // Whether meanings are blurred by default
     sortField: 'group', // Default sorting
     sortAscending: true
+  },
+  // Game Mode state
+  game: {
+    groupFilter: 'Group 1',
+    targetClusters: [], // Array of arrays of synonym words
+    foundClusters: [], // Array of arrays of successfully found clusters
+    activeSelection: [], // Words currently selected in guess
+    allPoolWords: [] // Pre-filtered list of words belonging to a cluster
   }
 };
 
@@ -435,6 +443,12 @@ function showView(viewName) {
         }
       }, 120);
     }
+  } else if (viewName === 'game') {
+    const activeGroup = state.study.groupFilter !== 'All' ? state.study.groupFilter : 'Group 1';
+    state.game.groupFilter = activeGroup;
+    const gameSel = document.getElementById('game-group-filter');
+    if (gameSel) gameSel.value = activeGroup;
+    startNewGame();
   }
 }
 
@@ -458,6 +472,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
           state.study.currentIndex = idx;
         }
       }
+    } else if (state.currentView === 'game') {
+      // Sync game group selection back to study and excel filters
+      state.study.groupFilter = state.game.groupFilter;
+      const studyGroupSel = document.getElementById('study-group-filter');
+      if (studyGroupSel) studyGroupSel.value = state.game.groupFilter;
+      syncFiltersStudyToExcel();
     }
     showView(viewName);
   });
@@ -1318,6 +1338,329 @@ function generateDynamicIcon() {
   img.src = url;
 }
 
+// --- Game Mode Logic ---
+
+function computeSynonymClusters(groupName) {
+  // Get all words in the group
+  const groupWords = allWords.filter(w => w.group === groupName).map(w => w.word.toLowerCase());
+  if (groupWords.length === 0) return [];
+
+  // Build adjacency list for synonyms graph
+  const adj = {};
+  groupWords.forEach(w => {
+    adj[w] = new Set();
+  });
+
+  // Extract relations
+  groupWords.forEach(w => {
+    const progress = userProgress[w];
+    if (!progress) return;
+
+    // Direct synonyms from progress
+    const synList = progress.synonyms
+      ? progress.synonyms.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    synList.forEach(s => {
+      // If the synonym is in the same group, draw an edge
+      if (groupWords.includes(s)) {
+        adj[w].add(s);
+        adj[s].add(w);
+      }
+      
+      // Secondary check: find other words in the same group that have the same synonym
+      groupWords.forEach(other => {
+        if (other === w) return;
+        const otherProg = userProgress[other];
+        if (!otherProg) return;
+        const otherSyns = otherProg.synonyms
+          ? otherProg.synonyms.split(',').map(sy => sy.trim().toLowerCase()).filter(Boolean)
+          : [];
+        if (otherSyns.includes(s)) {
+          adj[w].add(other);
+          adj[other].add(w);
+        }
+      });
+    });
+  });
+
+  // Connected components solver (DFS)
+  const visited = new Set();
+  const clusters = [];
+
+  groupWords.forEach(w => {
+    if (visited.has(w)) return;
+
+    const component = [];
+    const queue = [w];
+    visited.add(w);
+
+    while (queue.length > 0) {
+      const curr = queue.shift();
+      component.push(curr);
+
+      adj[curr].forEach(neighbor => {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          queue.push(neighbor);
+        }
+      });
+    }
+
+    // Only keep components of size >= 2 (clusters)
+    // Also, only keep if at least one word has some progress (otherwise it's just group singletons)
+    const hasProgressWord = component.some(word => {
+      const p = userProgress[word];
+      return p && (p.meaning || p.synonyms);
+    });
+
+    if (component.length >= 2 && hasProgressWord) {
+      // Map back to original case
+      const originalCasedComp = component.map(lc => {
+        const found = allWords.find(wordObj => wordObj.word.toLowerCase() === lc);
+        return found ? found.word : lc;
+      });
+      clusters.push(originalCasedComp);
+    }
+  });
+
+  return clusters;
+}
+
+function startNewGame() {
+  const group = state.game.groupFilter;
+  const clusters = computeSynonymClusters(group);
+
+  if (clusters.length === 0) {
+    document.getElementById('game-container').style.display = 'none';
+    document.getElementById('game-empty-state-fallback').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('game-empty-state-fallback').style.display = 'none';
+  document.getElementById('game-container').style.display = 'block';
+
+  // Set game state
+  state.game.targetClusters = clusters.map(c => [...c]); // copy array contents
+  state.game.foundClusters = [];
+  state.game.activeSelection = [];
+  
+  // pool words are all unique words inside target clusters
+  const poolSet = new Set();
+  clusters.forEach(c => c.forEach(w => poolSet.add(w)));
+  // convert set to array and shuffle
+  state.game.allPoolWords = Array.from(poolSet).sort(() => Math.random() - 0.5);
+
+  renderGameBoard();
+  showToast(`New game started for ${group}!`);
+}
+
+function renderGameBoard() {
+  const scoreEl = document.getElementById('game-score');
+  const remainingEl = document.getElementById('game-remaining-words');
+  const poolEl = document.getElementById('game-word-pool');
+  const workspaceEl = document.getElementById('game-guess-workspace');
+  const foundEl = document.getElementById('game-found-clusters');
+
+  const totalClusters = state.game.targetClusters.length + state.game.foundClusters.length;
+  scoreEl.textContent = `${state.game.foundClusters.length} / ${totalClusters}`;
+
+  // Count remaining words in target clusters
+  const remSet = new Set();
+  state.game.targetClusters.forEach(c => c.forEach(w => remSet.add(w)));
+  remainingEl.textContent = remSet.size;
+
+  // Render pool words
+  if (remSet.size === 0) {
+    poolEl.innerHTML = `<div style="font-size: 13px; color: #10b981; font-weight: 700; width: 100%; text-align: center; padding: 20px 0;">🎉 Congratulations! You found all synonym clusters!</div>`;
+  } else {
+    // only show words that haven't been found yet
+    poolEl.innerHTML = state.game.allPoolWords
+      .filter(w => remSet.has(w))
+      .map(w => {
+        const isSelected = state.game.activeSelection.includes(w);
+        return `<span class="game-word-card ${isSelected ? 'selected' : ''}" onclick="toggleWordSelection('${w.replace(/'/g, "\\'")}')">${w}</span>`;
+      }).join('');
+  }
+
+  // Render guess workspace
+  if (state.game.activeSelection.length === 0) {
+    workspaceEl.innerHTML = `<div class="empty-workspace-state" id="empty-workspace-state">Select words from the pool to build a synonym cluster.</div>`;
+  } else {
+    workspaceEl.innerHTML = state.game.activeSelection
+      .map(w => `<span class="game-word-card selected" onclick="toggleWordSelection('${w.replace(/'/g, "\\'")}')">${w}</span>`)
+      .join('');
+  }
+
+  // Render found clusters list
+  if (state.game.foundClusters.length === 0) {
+    foundEl.innerHTML = `<div style="font-size: 12px; color: var(--accents-3); text-align: center; padding: 20px 0;">No clusters found yet. Guess correctly to unlock them!</div>`;
+  } else {
+    foundEl.innerHTML = state.game.foundClusters.map((c, index) => `
+      <div class="found-cluster-card">
+        <div class="found-cluster-title">Cluster ${index + 1}</div>
+        <div class="found-cluster-words">
+          ${c.map(w => `<span class="tag-badge" style="background-color: rgba(16, 185, 129, 0.08); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.15); font-weight: 600;">${w}</span>`).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function toggleWordSelection(word) {
+  const index = state.game.activeSelection.indexOf(word);
+  if (index === -1) {
+    state.game.activeSelection.push(word);
+  } else {
+    state.game.activeSelection.splice(index, 1);
+  }
+  renderGameBoard();
+}
+
+function verifyActiveClusterGuess() {
+  const active = state.game.activeSelection;
+  if (active.length < 2) {
+    showToast('A synonym cluster must contain at least 2 words!');
+    return;
+  }
+
+  // Check if active matches any of the target clusters (order-independent)
+  const activeSorted = [...active].sort().map(w => w.toLowerCase());
+
+  let foundIndex = -1;
+  for (let i = 0; i < state.game.targetClusters.length; i++) {
+    const targetSorted = [...state.game.targetClusters[i]].sort().map(w => w.toLowerCase());
+    if (activeSorted.length === targetSorted.length && activeSorted.every((w, idx) => w === targetSorted[idx])) {
+      foundIndex = i;
+      break;
+    }
+  }
+
+  const workspaceEl = document.getElementById('game-guess-workspace');
+
+  if (foundIndex !== -1) {
+    // Correct guess!
+    const matchedCluster = state.game.targetClusters.splice(foundIndex, 1)[0];
+    state.game.foundClusters.push(matchedCluster);
+    state.game.activeSelection = [];
+
+    // Success styling feedback
+    workspaceEl.classList.add('workspace-success');
+    setTimeout(() => {
+      workspaceEl.classList.remove('workspace-success');
+      renderGameBoard();
+    }, 400);
+
+    showToast('Correct synonym cluster!');
+  } else {
+    // Incorrect guess
+    workspaceEl.classList.add('workspace-shake');
+    // Highlight items as mismatched
+    document.querySelectorAll('#game-guess-workspace .game-word-card').forEach(card => {
+      card.classList.add('mismatched');
+    });
+
+    setTimeout(() => {
+      workspaceEl.classList.remove('workspace-shake');
+      // remove mismatched
+      document.querySelectorAll('#game-guess-workspace .game-word-card').forEach(card => {
+        card.classList.remove('mismatched');
+      });
+      // Return cards to pool
+      state.game.activeSelection = [];
+      renderGameBoard();
+    }, 600);
+
+    showToast('Incorrect synonym cluster. Try again!');
+  }
+}
+
+function revealGameHint() {
+  if (state.game.targetClusters.length === 0) return;
+
+  // Grab first remaining target cluster
+  const cluster = state.game.targetClusters[0];
+  // Reveal the meaning of one word in that cluster
+  const word = cluster[0];
+  const progress = userProgress[word.toLowerCase()];
+  const meaningHint = progress && progress.meaning ? progress.meaning : 'no definition recorded yet';
+
+  showToast(`Hint: The meaning of one cluster word "${word}" is: "${meaningHint}"`, 6000);
+}
+
+// Make globally accessible
+window.toggleWordSelection = toggleWordSelection;
+
+function initSynonymsAutocomplete(inputId, autocompleteId) {
+  const inputEl = document.getElementById(inputId);
+  const autocompleteEl = document.getElementById(autocompleteId);
+  if (!inputEl || !autocompleteEl) return;
+
+  function renderSuggestions(query) {
+    query = query.toLowerCase().trim();
+    if (!query) {
+      autocompleteEl.style.display = 'none';
+      return;
+    }
+
+    // Filter words matching query prefix or substring
+    const matches = allWords
+      .map(w => w.word)
+      .filter(w => w.toLowerCase().includes(query))
+      .slice(0, 8); // limit to 8 suggestions
+
+    if (matches.length > 0) {
+      autocompleteEl.innerHTML = matches.map(m => `
+        <div class="synonyms-autocomplete-item" data-val="${m}">${m}</div>
+      `).join('');
+      autocompleteEl.style.display = 'block';
+
+      // Bind click triggers
+      autocompleteEl.querySelectorAll('.synonyms-autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const val = item.getAttribute('data-val');
+          
+          // Replace last comma-separated token with selected word
+          const tokens = inputEl.value.split(',');
+          tokens[tokens.length - 1] = ' ' + val;
+          inputEl.value = tokens.join(',').trim() + ', ';
+          
+          autocompleteEl.style.display = 'none';
+          inputEl.focus();
+
+          // Dispatch input event to trigger auto-save if inside study panel
+          inputEl.dispatchEvent(new Event('input'));
+        });
+      });
+    } else {
+      autocompleteEl.style.display = 'none';
+    }
+  }
+
+  inputEl.addEventListener('input', (e) => {
+    const parts = e.target.value.split(',');
+    const activeToken = parts[parts.length - 1].trim();
+    renderSuggestions(activeToken);
+  });
+
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && autocompleteEl.style.display === 'block') {
+      const firstItem = autocompleteEl.querySelector('.synonyms-autocomplete-item');
+      if (firstItem) {
+        e.preventDefault();
+        firstItem.click();
+      }
+    }
+  });
+
+  // Close when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${autocompleteId}`)) {
+      autocompleteEl.style.display = 'none';
+    }
+  });
+}
+
 // --- App Load Event ---
 window.addEventListener('DOMContentLoaded', () => {
   initTheme();
@@ -1339,17 +1682,15 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('excel-group-filter')
   ];
 
-  groupSelects.forEach(select => {
-    // Clear initial options, keep 'All'
-    select.innerHTML = '<option value="All">All Groups</option>';
-    
-    // Sort groups dynamically (since we have Groups 1 to 38)
-    const sortedGroups = Object.keys(VOCAB_DATA).sort((a, b) => {
-      const numA = parseInt(a.replace('Group ', '')) || 0;
-      const numB = parseInt(b.replace('Group ', '')) || 0;
-      return numA - numB;
-    });
+  const sortedGroups = Object.keys(VOCAB_DATA).sort((a, b) => {
+    const numA = parseInt(a.replace('Group ', '')) || 0;
+    const numB = parseInt(b.replace('Group ', '')) || 0;
+    return numA - numB;
+  });
 
+  groupSelects.forEach(select => {
+    if (!select) return;
+    select.innerHTML = '<option value="All">All Groups</option>';
     sortedGroups.forEach(groupName => {
       const opt = document.createElement('option');
       opt.value = groupName;
@@ -1357,6 +1698,18 @@ window.addEventListener('DOMContentLoaded', () => {
       select.appendChild(opt);
     });
   });
+
+  // Game Group dropdown (no 'All Groups' option)
+  const gameGroupSelect = document.getElementById('game-group-filter');
+  if (gameGroupSelect) {
+    gameGroupSelect.innerHTML = '';
+    sortedGroups.forEach(groupName => {
+      const opt = document.createElement('option');
+      opt.value = groupName;
+      opt.textContent = groupName;
+      gameGroupSelect.appendChild(opt);
+    });
+  }
 
   // Tag Filter listeners
   document.getElementById('study-tag-filter').addEventListener('change', (e) => {
@@ -1591,7 +1944,28 @@ window.addEventListener('DOMContentLoaded', () => {
     showToast(`Saved changes for: "${modalWord}"`);
   });
 
+  // Initialize Synonyms Autocompletes
+  initSynonymsAutocomplete('study-synonyms', 'study-synonyms-autocomplete');
+  initSynonymsAutocomplete('modal-synonyms', 'modal-synonyms-autocomplete');
+
+  // Game Mode controls
+  document.getElementById('game-group-filter').addEventListener('change', (e) => {
+    state.game.groupFilter = e.target.value;
+  });
+
+  document.getElementById('game-start-btn').addEventListener('click', startNewGame);
+  
+  document.getElementById('game-clear-btn').addEventListener('click', () => {
+    state.game.activeSelection = [];
+    renderGameBoard();
+  });
+
+  document.getElementById('game-submit-btn').addEventListener('click', verifyActiveClusterGuess);
+  document.getElementById('game-hint-btn').addEventListener('click', revealGameHint);
+
   // Make removeWordTag and removeModalWordTag globally accessible for inline onclick handlers
+  window.removeWordTag = removeWordTag;
+  window.removeModalWordTag = removeModalWordTag;
   window.removeWordTag = removeWordTag;
   window.removeModalWordTag = removeModalWordTag;
 
