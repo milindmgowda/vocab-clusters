@@ -462,12 +462,14 @@ function renderStudyWord() {
     document.getElementById('study-meaning').disabled = true;
     document.getElementById('study-synonyms').disabled = true;
     document.getElementById('study-tags-input').disabled = true;
+    document.getElementById('study-save-btn').disabled = true;
     return;
   }
 
   document.getElementById('study-meaning').disabled = false;
   document.getElementById('study-synonyms').disabled = false;
   document.getElementById('study-tags-input').disabled = false;
+  document.getElementById('study-save-btn').disabled = false;
 
   const wordObj = state.study.filteredWords[state.study.currentIndex];
   const progress = userProgress[wordObj.word.toLowerCase()] || { meaning: '', synonyms: '' };
@@ -1323,6 +1325,12 @@ window.addEventListener('DOMContentLoaded', () => {
       }
       saveActiveWordFromUI(false); // Local save only
     });
+  });
+
+  // Dedicated Save to Cloud button click listener
+  document.getElementById('study-save-btn').addEventListener('click', () => {
+    saveActiveWordFromUI(true); // Force cloud sync
+    showToast(`Saved and synced to cloud!`);
   });
 
   // Autocomplete Tag Input logic
