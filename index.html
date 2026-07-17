@@ -93,6 +93,16 @@
         </div>
         
         <div class="control-group">
+          <label for="study-sentiment-filter">Charge</label>
+          <select class="form-select" id="study-sentiment-filter">
+            <option value="All">All Charges</option>
+            <option value="positive">Positive (+)</option>
+            <option value="neutral">Neutral (=)</option>
+            <option value="negative">Negative (-)</option>
+          </select>
+        </div>
+        
+        <div class="control-group">
           <label for="study-search-input">Search Word / Meaning</label>
           <div class="search-wrapper">
             <input type="search" class="form-input" id="study-search-input" placeholder="Type to search...">
@@ -132,6 +142,15 @@
                 <input type="text" class="form-input" id="study-tags-input" placeholder="Search or type a new tag..." autocomplete="off">
                 <div class="tags-autocomplete" id="study-tags-autocomplete"></div>
               </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Word Charge / Connotation</label>
+            <div class="sentiment-group" id="study-sentiment-group">
+              <button class="btn sentiment-btn pos" data-sentiment="positive" type="button">Positive (+)</button>
+              <button class="btn sentiment-btn neu" data-sentiment="neutral" type="button">Neutral (=)</button>
+              <button class="btn sentiment-btn neg" data-sentiment="negative" type="button">Negative (-)</button>
             </div>
           </div>
 
@@ -189,6 +208,16 @@
             </select>
           </div>
           
+          <div class="control-group" style="width: 180px;">
+            <label for="excel-sentiment-filter">Filter Charge</label>
+            <select class="form-select" id="excel-sentiment-filter">
+              <option value="All">All Charges</option>
+              <option value="positive">Positive (+)</option>
+              <option value="neutral">Neutral (=)</option>
+              <option value="negative">Negative (-)</option>
+            </select>
+          </div>
+          
           <div class="control-group" style="width: 260px;">
             <label for="excel-search-input">Search Spreadsheet</label>
             <input type="search" class="form-input" id="excel-search-input" placeholder="Search words or meanings...">
@@ -212,13 +241,14 @@
         <table class="spreadsheet-table" id="excel-table">
           <thead>
             <tr>
-              <th data-sort="word" style="width: 18%; cursor: pointer;">Word</th>
-              <th data-sort="group" style="width: 10%; cursor: pointer;">Group ▲</th>
-              <th data-sort="meaning" style="width: 32%; cursor: pointer;">Meaning</th>
-              <th data-sort="synonyms" style="width: 15%; cursor: pointer;">Synonyms</th>
-              <th data-sort="tags" style="width: 15%; cursor: pointer;">Tags</th>
-              <th data-sort="status" style="width: 10%; cursor: pointer;">Status</th>
-              <th style="width: 10%;">Actions</th>
+              <th data-sort="word" style="width: 15%; cursor: pointer;">Word</th>
+              <th data-sort="group" style="width: 8%; cursor: pointer;">Group ▲</th>
+              <th data-sort="meaning" style="width: 30%; cursor: pointer;">Meaning</th>
+              <th data-sort="synonyms" style="width: 12%; cursor: pointer;">Synonyms</th>
+              <th data-sort="tags" style="width: 12%; cursor: pointer;">Tags</th>
+              <th data-sort="sentiment" style="width: 8%; cursor: pointer;">Charge</th>
+              <th data-sort="status" style="width: 7%; cursor: pointer;">Status</th>
+              <th style="width: 8%;">Actions</th>
             </tr>
           </thead>
           <tbody id="excel-tbody">

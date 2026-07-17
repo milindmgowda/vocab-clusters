@@ -999,6 +999,90 @@ input:checked + .slider:before {
   background-color: var(--accents-1) !important;
 }
 
+/* Sentiment / Connotation Button Group */
+.sentiment-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.sentiment-btn {
+  flex: 1;
+  height: 38px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background-color: var(--background);
+  color: var(--accents-4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sentiment-btn:hover {
+  color: var(--foreground);
+  background-color: var(--accents-1);
+}
+
+/* Connotation Fills */
+.sentiment-btn.pos:hover, .sentiment-btn.pos.active {
+  border-color: #10b981;
+  color: #10b981;
+}
+.sentiment-btn.pos.active {
+  background-color: rgba(16, 185, 129, 0.1);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.sentiment-btn.neu:hover, .sentiment-btn.neu.active {
+  border-color: #6b7280;
+  color: var(--foreground);
+}
+.sentiment-btn.neu.active {
+  background-color: var(--accents-1);
+  box-shadow: 0 0 8px rgba(107, 114, 128, 0.2);
+}
+
+.sentiment-btn.neg:hover, .sentiment-btn.neg.active {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+.sentiment-btn.neg.active {
+  background-color: rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+/* Connotation Badges in Grid */
+.sentiment-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+
+.sentiment-badge.pos {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.sentiment-badge.neu {
+  background-color: var(--accents-2);
+  color: var(--accents-5);
+}
+
+.sentiment-badge.neg {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
 /* Mobile-Friendly Optimizations */
 @media (max-width: 768px) {
   .app-container {

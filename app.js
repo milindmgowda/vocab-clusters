@@ -5,6 +5,7 @@ let allWords = [];
 let userProgress = {};
 let activeTags = [];
 let currentWordTags = [];
+let currentWordSentiment = null;
 
 // Application state
 const state = {
@@ -16,6 +17,7 @@ const state = {
     groupFilter: 'All',
     statusFilter: 'All',
     tagFilter: 'All',
+    sentimentFilter: 'All',
     searchQuery: ''
   },
   // Excel mode state
@@ -24,6 +26,7 @@ const state = {
     groupFilter: 'All',
     statusFilter: 'All',
     tagFilter: 'All',
+    sentimentFilter: 'All',
     searchQuery: '',
     selectedWord: null, // Currently selected word for synonym highlighting
     revealedMeanings: new Set(), // Set of words whose meanings are revealed in spreadsheet
@@ -320,7 +323,7 @@ function triggerCloudSync() {
   }, 1200); // 1.2s delay to prevent spamming
 }
 
-function saveWordProgress(word, meaning, synonyms, tags = [], shouldSync = false) {
+function saveWordProgress(word, meaning, synonyms, tags = [], sentiment = null, shouldSync = false) {
   if (!word) return;
 
   const wordKey = word.toLowerCase().trim();
@@ -329,12 +332,13 @@ function saveWordProgress(word, meaning, synonyms, tags = [], shouldSync = false
 
   const prevProg = userProgress[wordKey];
   const tagsChanged = JSON.stringify(prevProg?.tags || []) !== JSON.stringify(tags);
-  const hasChanged = !prevProg || prevProg.meaning !== meaning || prevProg.synonyms !== synonyms || tagsChanged;
+  const sentimentChanged = (prevProg?.sentiment || null) !== sentiment;
+  const hasChanged = !prevProg || prevProg.meaning !== meaning || prevProg.synonyms !== synonyms || tagsChanged || sentimentChanged;
 
-  if (!meaning && !synonyms && (!tags || tags.length === 0)) {
+  if (!meaning && !synonyms && (!tags || tags.length === 0) && !sentiment) {
     delete userProgress[wordKey];
   } else {
-    userProgress[wordKey] = { meaning, synonyms, tags };
+    userProgress[wordKey] = { meaning, synonyms, tags, sentiment };
   }
 
   localStorage.setItem('vocab_study_progress', JSON.stringify(userProgress));
@@ -401,6 +405,14 @@ function applyStudyFilters() {
       }
     }
     
+    // Sentiment filter
+    if (state.study.sentimentFilter !== 'All') {
+      const activeSentiment = progress?.sentiment || null;
+      if (activeSentiment !== state.study.sentimentFilter) {
+        return false;
+      }
+    }
+    
     // Search query
     if (query) {
       const matchWord = w.word.toLowerCase().includes(query);
@@ -425,7 +437,7 @@ function saveActiveWordFromUI(shouldSync = false) {
   const currentWordObj = state.study.filteredWords[state.study.currentIndex];
   const meaning = document.getElementById('study-meaning').value;
   const synonyms = document.getElementById('study-synonyms').value;
-  saveWordProgress(currentWordObj.word, meaning, synonyms, currentWordTags, shouldSync);
+  saveWordProgress(currentWordObj.word, meaning, synonyms, currentWordTags, currentWordSentiment, shouldSync);
 }
 
 function renderStudyWord() {
@@ -507,6 +519,17 @@ function renderStudyWord() {
   // Set current tags
   currentWordTags = Array.isArray(progress.tags) ? [...progress.tags] : [];
   renderStudyTagsList();
+
+  // Set current sentiment
+  currentWordSentiment = progress.sentiment || null;
+  document.querySelectorAll('#study-sentiment-group .sentiment-btn').forEach(btn => {
+    const s = btn.getAttribute('data-sentiment');
+    if (s === currentWordSentiment) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
 
   // Add click listeners to card buttons
   document.getElementById('study-random-btn').addEventListener('click', jumpToRandomWord);
@@ -652,6 +675,14 @@ function applyExcelFilters() {
       }
     }
     
+    // Sentiment filter
+    if (state.excel.sentimentFilter !== 'All') {
+      const activeSentiment = progress?.sentiment || null;
+      if (activeSentiment !== state.excel.sentimentFilter) {
+        return false;
+      }
+    }
+    
     // Search query
     if (query) {
       const matchWord = w.word.toLowerCase().includes(query);
@@ -691,9 +722,12 @@ function sortExcelWords() {
     } else if (field === 'tags') {
       valA = (userProgress[a.word.toLowerCase()]?.tags || []).join(',').toLowerCase();
       valB = (userProgress[b.word.toLowerCase()]?.tags || []).join(',').toLowerCase();
+    } else if (field === 'sentiment') {
+      valA = userProgress[a.word.toLowerCase()]?.sentiment || '';
+      valB = userProgress[b.word.toLowerCase()]?.sentiment || '';
     } else if (field === 'status') {
-      const aHas = userProgress[a.word.toLowerCase()] && (userProgress[a.word.toLowerCase()].meaning || userProgress[a.word.toLowerCase()].synonyms || userProgress[a.word.toLowerCase()].tags?.length > 0);
-      const bHas = userProgress[b.word.toLowerCase()] && (userProgress[b.word.toLowerCase()].meaning || userProgress[b.word.toLowerCase()].synonyms || userProgress[b.word.toLowerCase()].tags?.length > 0);
+      const aHas = userProgress[a.word.toLowerCase()] && (userProgress[a.word.toLowerCase()].meaning || userProgress[a.word.toLowerCase()].synonyms || userProgress[a.word.toLowerCase()].tags?.length > 0 || userProgress[a.word.toLowerCase()].sentiment);
+      const bHas = userProgress[b.word.toLowerCase()] && (userProgress[b.word.toLowerCase()].meaning || userProgress[b.word.toLowerCase()].synonyms || userProgress[b.word.toLowerCase()].tags?.length > 0 || userProgress[b.word.toLowerCase()].sentiment);
       valA = aHas ? 1 : 0;
       valB = bHas ? 1 : 0;
     }
@@ -710,7 +744,7 @@ function renderExcelGrid() {
   if (state.excel.filteredWords.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" class="empty-state">
+        <td colspan="8" class="empty-state">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -762,8 +796,8 @@ function renderExcelGrid() {
 
   let htmlRows = '';
   state.excel.filteredWords.forEach(w => {
-    const prog = userProgress[w.word.toLowerCase()] || { meaning: '', synonyms: '', tags: [] };
-    const hasProgress = prog.meaning || prog.synonyms || (prog.tags && prog.tags.length > 0);
+    const prog = userProgress[w.word.toLowerCase()] || { meaning: '', synonyms: '', tags: [], sentiment: null };
+    const hasProgress = prog.meaning || prog.synonyms || (prog.tags && prog.tags.length > 0) || prog.sentiment;
     
     // Highlights
     const isSelected = w.word === selWord;
@@ -806,6 +840,17 @@ function renderExcelGrid() {
         .join('');
     }
 
+    // Sentiment Connotation badges
+    let sentimentCellContent = '-';
+    if (prog.sentiment) {
+      let sentimentText = '';
+      let sentimentClass = '';
+      if (prog.sentiment === 'positive') { sentimentText = '+'; sentimentClass = 'pos'; }
+      else if (prog.sentiment === 'neutral') { sentimentText = '='; sentimentClass = 'neu'; }
+      else if (prog.sentiment === 'negative') { sentimentText = '-'; sentimentClass = 'neg'; }
+      sentimentCellContent = `<span class="sentiment-badge ${sentimentClass}">${sentimentText}</span>`;
+    }
+
     htmlRows += `
       <tr class="${rowClass}" data-row-word="${w.word}">
         <td class="excel-word-cell" data-word="${w.word}" data-label="Word">${w.word}</td>
@@ -813,6 +858,7 @@ function renderExcelGrid() {
         ${meaningCell}
         <td data-label="Synonyms">${synonymCellContent}</td>
         <td data-label="Tags">${tagsCellContent}</td>
+        <td data-label="Charge">${sentimentCellContent}</td>
         <td data-label="Status">${statusBadge}</td>
         <td data-label="Actions">
           <button class="btn btn-secondary excel-edit-btn" data-word="${w.word}" style="height: 28px; padding: 0 10px; font-size: 11px;">
@@ -1183,6 +1229,35 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('excel-tag-filter').addEventListener('change', (e) => {
     state.excel.tagFilter = e.target.value;
     applyExcelFilters();
+  });
+
+  // Sentiment/Connotation Filter listeners
+  document.getElementById('study-sentiment-filter').addEventListener('change', (e) => {
+    saveActiveWordFromUI(true);
+    state.study.sentimentFilter = e.target.value;
+    state.study.currentIndex = 0;
+    applyStudyFilters();
+  });
+
+  document.getElementById('excel-sentiment-filter').addEventListener('change', (e) => {
+    state.excel.sentimentFilter = e.target.value;
+    applyExcelFilters();
+  });
+
+  // Segmented Connotation Button click listeners
+  document.querySelectorAll('#study-sentiment-group .sentiment-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const selected = btn.getAttribute('data-sentiment');
+      if (currentWordSentiment === selected) {
+        currentWordSentiment = null;
+        btn.classList.remove('active');
+      } else {
+        document.querySelectorAll('#study-sentiment-group .sentiment-btn').forEach(b => b.classList.remove('active'));
+        currentWordSentiment = selected;
+        btn.classList.add('active');
+      }
+      saveActiveWordFromUI(false); // Local save only
+    });
   });
 
   // Autocomplete Tag Input logic
