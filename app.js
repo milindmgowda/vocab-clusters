@@ -320,7 +320,7 @@ function triggerCloudSync() {
   }, 1200); // 1.2s delay to prevent spamming
 }
 
-function saveWordProgress(word, meaning, synonyms, shouldSync = false) {
+function saveWordProgress(word, meaning, synonyms, tags = [], shouldSync = false) {
   if (!word) return;
 
   const wordKey = word.toLowerCase().trim();
@@ -328,16 +328,18 @@ function saveWordProgress(word, meaning, synonyms, shouldSync = false) {
   synonyms = synonyms.trim();
 
   const prevProg = userProgress[wordKey];
-  const hasChanged = !prevProg || prevProg.meaning !== meaning || prevProg.synonyms !== synonyms;
+  const tagsChanged = JSON.stringify(prevProg?.tags || []) !== JSON.stringify(tags);
+  const hasChanged = !prevProg || prevProg.meaning !== meaning || prevProg.synonyms !== synonyms || tagsChanged;
 
-  if (!meaning && !synonyms) {
+  if (!meaning && !synonyms && (!tags || tags.length === 0)) {
     delete userProgress[wordKey];
   } else {
-    userProgress[wordKey] = { meaning, synonyms };
+    userProgress[wordKey] = { meaning, synonyms, tags };
   }
 
   localStorage.setItem('vocab_study_progress', JSON.stringify(userProgress));
   updateProgressSummary();
+  refreshActiveTags();
   
   if (shouldSync && hasChanged) {
     triggerCloudSync();
