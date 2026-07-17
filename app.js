@@ -115,7 +115,11 @@ function loadData() {
   const savedProgress = localStorage.getItem('vocab_study_progress');
   if (savedProgress) {
     try {
-      userProgress = JSON.parse(savedProgress);
+      const rawProgress = JSON.parse(savedProgress);
+      userProgress = {};
+      for (const [key, value] of Object.entries(rawProgress)) {
+        userProgress[key.toLowerCase().trim()] = value;
+      }
     } catch (e) {
       console.error('Failed to parse progress data', e);
       userProgress = {};
@@ -131,7 +135,7 @@ function loadData() {
 function updateProgressSummary() {
   let definedCount = 0;
   allWords.forEach(w => {
-    const progress = userProgress[w.word];
+    const progress = userProgress[w.word.toLowerCase()];
     if (progress && (progress.meaning || progress.synonyms)) {
       definedCount++;
     }
@@ -209,8 +213,14 @@ async function loadCloudProgress() {
     }
     
     if (resData.status === 'success' && resData.data) {
+      // Normalize cloud keys to lowercase
+      const normalizedCloud = {};
+      for (const [key, value] of Object.entries(resData.data)) {
+        normalizedCloud[key.toLowerCase().trim()] = value;
+      }
+      
       // Merge cloud data with local data
-      const mergedProgress = { ...userProgress, ...resData.data };
+      const mergedProgress = { ...userProgress, ...normalizedCloud };
       userProgress = mergedProgress;
       localStorage.setItem('vocab_study_progress', JSON.stringify(userProgress));
       updateProgressSummary();
@@ -264,16 +274,17 @@ function triggerCloudSync() {
 function saveWordProgress(word, meaning, synonyms, shouldSync = false) {
   if (!word) return;
 
+  const wordKey = word.toLowerCase().trim();
   meaning = meaning.trim();
   synonyms = synonyms.trim();
 
-  const prevProg = userProgress[word];
+  const prevProg = userProgress[wordKey];
   const hasChanged = !prevProg || prevProg.meaning !== meaning || prevProg.synonyms !== synonyms;
 
   if (!meaning && !synonyms) {
-    delete userProgress[word];
+    delete userProgress[wordKey];
   } else {
-    userProgress[word] = { meaning, synonyms };
+    userProgress[wordKey] = { meaning, synonyms };
   }
 
   localStorage.setItem('vocab_study_progress', JSON.stringify(userProgress));
@@ -327,7 +338,7 @@ function applyStudyFilters() {
     }
     
     // Status filter
-    const progress = userProgress[w.word];
+    const progress = userProgress[w.word.toLowerCase()];
     const hasData = progress && (progress.meaning || progress.synonyms);
     if (state.study.statusFilter === 'Defined' && !hasData) return false;
     if (state.study.statusFilter === 'Undefined' && hasData) return false;
@@ -335,8 +346,8 @@ function applyStudyFilters() {
     // Search query
     if (query) {
       const matchWord = w.word.toLowerCase().includes(query);
-      const matchMeaning = progress && progress.meaning.toLowerCase().includes(query);
-      const matchSynonyms = progress && progress.synonyms.toLowerCase().includes(query);
+      const matchMeaning = progress && (progress.meaning || '').toLowerCase().includes(query);
+      const matchSynonyms = progress && (progress.synonyms || '').toLowerCase().includes(query);
       return matchWord || matchMeaning || matchSynonyms;
     }
     
@@ -380,7 +391,7 @@ function renderStudyWord() {
   document.getElementById('study-synonyms').disabled = false;
 
   const wordObj = state.study.filteredWords[state.study.currentIndex];
-  const progress = userProgress[wordObj.word] || { meaning: '', synonyms: '' };
+  const progress = userProgress[wordObj.word.toLowerCase()] || { meaning: '', synonyms: '' };
 
   // Update card elements
   container.innerHTML = `
@@ -478,7 +489,7 @@ const autosaveFields = debounceSave(() => {
     saveActiveWordFromUI(false); // Local save only on typing
     // Update card defined/undefined pill visually without redraw
     const currentWordObj = state.study.filteredWords[state.study.currentIndex];
-    const progress = userProgress[currentWordObj.word] || { meaning: '', synonyms: '' };
+    const progress = userProgress[currentWordObj.word.toLowerCase()] || { meaning: '', synonyms: '' };
     const badge = document.querySelector('.word-display-container .word-status-indicator');
     if (badge) {
       const hasData = progress.meaning || progress.synonyms;
@@ -532,7 +543,7 @@ function applyExcelFilters() {
     }
     
     // Status filter
-    const progress = userProgress[w.word];
+    const progress = userProgress[w.word.toLowerCase()];
     const hasData = progress && (progress.meaning || progress.synonyms);
     if (state.excel.statusFilter === 'Defined' && !hasData) return false;
     if (state.excel.statusFilter === 'Undefined' && hasData) return false;
@@ -540,8 +551,8 @@ function applyExcelFilters() {
     // Search query
     if (query) {
       const matchWord = w.word.toLowerCase().includes(query);
-      const matchMeaning = progress && progress.meaning.toLowerCase().includes(query);
-      const matchSynonyms = progress && progress.synonyms.toLowerCase().includes(query);
+      const matchMeaning = progress && (progress.meaning || '').toLowerCase().includes(query);
+      const matchSynonyms = progress && (progress.synonyms || '').toLowerCase().includes(query);
       return matchWord || matchMeaning || matchSynonyms;
     }
     
@@ -568,14 +579,14 @@ function sortExcelWords() {
       valA = a.groupNumber;
       valB = b.groupNumber;
     } else if (field === 'meaning') {
-      valA = (userProgress[a.word]?.meaning || '').toLowerCase();
-      valB = (userProgress[b.word]?.meaning || '').toLowerCase();
+      valA = (userProgress[a.word.toLowerCase()]?.meaning || '').toLowerCase();
+      valB = (userProgress[b.word.toLowerCase()]?.meaning || '').toLowerCase();
     } else if (field === 'synonyms') {
-      valA = (userProgress[a.word]?.synonyms || '').toLowerCase();
-      valB = (userProgress[b.word]?.synonyms || '').toLowerCase();
+      valA = (userProgress[a.word.toLowerCase()]?.synonyms || '').toLowerCase();
+      valB = (userProgress[b.word.toLowerCase()]?.synonyms || '').toLowerCase();
     } else if (field === 'status') {
-      const aHas = userProgress[a.word] && (userProgress[a.word].meaning || userProgress[a.word].synonyms);
-      const bHas = userProgress[b.word] && (userProgress[b.word].meaning || userProgress[b.word].synonyms);
+      const aHas = userProgress[a.word.toLowerCase()] && (userProgress[a.word.toLowerCase()].meaning || userProgress[a.word.toLowerCase()].synonyms);
+      const bHas = userProgress[b.word.toLowerCase()] && (userProgress[b.word.toLowerCase()].meaning || userProgress[b.word.toLowerCase()].synonyms);
       valA = aHas ? 1 : 0;
       valB = bHas ? 1 : 0;
     }
@@ -608,7 +619,7 @@ function renderExcelGrid() {
   // Pre-calculate mapping for rapid synonym highlighting checks
   const synonymMapping = {};
   state.excel.filteredWords.forEach(w => {
-    const prog = userProgress[w.word];
+    const prog = userProgress[w.word.toLowerCase()];
     if (prog && prog.synonyms) {
       synonymMapping[w.word] = prog.synonyms.split(',')
         .map(s => s.trim().toLowerCase())
@@ -623,9 +634,9 @@ function renderExcelGrid() {
   const selWord = state.excel.selectedWord;
   if (selWord) {
     const selLower = selWord.toLowerCase();
-    const selProg = userProgress[selWord];
+    const selProg = userProgress[selWord.toLowerCase()];
     // Synonyms listed by the selected word
-    const selWordSynonyms = selProg ? selProg.synonyms.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+    const selWordSynonyms = selProg && selProg.synonyms ? selProg.synonyms.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
     
     state.excel.filteredWords.forEach(w => {
       const wLower = w.word.toLowerCase();
@@ -634,7 +645,7 @@ function renderExcelGrid() {
       const isListedAsSynonym = selWordSynonyms.includes(wLower);
       
       // Match 2: The selected word is listed in this word's synonyms list
-      const listsSelWordAsSynonym = synonymMapping[w.word].includes(selLower);
+      const listsSelWordAsSynonym = synonymMapping[w.word] ? synonymMapping[w.word].includes(selLower) : false;
       
       if ((isListedAsSynonym || listsSelWordAsSynonym) && wLower !== selLower) {
         matches.add(w.word);
@@ -644,7 +655,7 @@ function renderExcelGrid() {
 
   let htmlRows = '';
   state.excel.filteredWords.forEach(w => {
-    const prog = userProgress[w.word] || { meaning: '', synonyms: '' };
+    const prog = userProgress[w.word.toLowerCase()] || { meaning: '', synonyms: '' };
     const hasProgress = prog.meaning || prog.synonyms;
     
     // Highlights
@@ -741,8 +752,8 @@ function handleWordCellClick(word) {
     state.excel.revealedMeanings.add(word);
 
     // Calculate synonym count to display in toast
-    const prog = userProgress[word];
-    const wordSynonyms = prog ? prog.synonyms.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+    const prog = userProgress[word.toLowerCase()];
+    const wordSynonyms = prog && prog.synonyms ? prog.synonyms.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
     
     showToast(`Selected "${word}". Click again to reveal meaning. Synonyms highlighted!`);
     renderExcelGrid();
@@ -751,7 +762,7 @@ function handleWordCellClick(word) {
 
 function jumpToEditWord(word) {
   // Find index in the study list of all words
-  const studyIndex = state.study.filteredWords.findIndex(w => w.word === word);
+  const studyIndex = state.study.filteredWords.findIndex(w => w.word.toLowerCase() === word.toLowerCase());
   
   if (studyIndex !== -1) {
     state.study.currentIndex = studyIndex;
@@ -768,7 +779,7 @@ function jumpToEditWord(word) {
     
     applyStudyFilters();
     
-    const index = state.study.filteredWords.findIndex(w => w.word === word);
+    const index = state.study.filteredWords.findIndex(w => w.word.toLowerCase() === word.toLowerCase());
     if (index !== -1) {
       state.study.currentIndex = index;
     }
@@ -863,8 +874,14 @@ document.getElementById('backup-import-file').addEventListener('change', (e) => 
         throw new Error('Invalid JSON format');
       }
       
+      // Normalize imported keys to lowercase
+      const normalizedImported = {};
+      for (const [key, value] of Object.entries(importedData)) {
+        normalizedImported[key.toLowerCase().trim()] = value;
+      }
+      
       // Merge progress
-      userProgress = { ...userProgress, ...importedData };
+      userProgress = { ...userProgress, ...normalizedImported };
       localStorage.setItem('vocab_study_progress', JSON.stringify(userProgress));
       
       updateProgressSummary();
