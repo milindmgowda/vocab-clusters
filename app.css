@@ -474,6 +474,128 @@ body {
   box-shadow: 0 1px 0 var(--border);
 }
 
+/* Tags Manager & Autocomplete */
+.tags-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--accents-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 4px;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.tags-list:empty::after {
+  content: 'No tags added yet';
+  font-size: 11px;
+  color: var(--accents-3);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  height: 24px;
+}
+
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 8px;
+  background-color: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .tag-badge {
+  background-color: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.tag-remove-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.tag-remove-btn:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .tag-remove-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.tags-input-container {
+  position: relative;
+  width: 100%;
+}
+
+.tags-autocomplete {
+  position: absolute;
+  bottom: 100%; /* Position above input since keyboard might cover it on mobile */
+  left: 0;
+  right: 0;
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-height: 160px;
+  overflow-y: auto;
+  display: none;
+  margin-bottom: 4px;
+}
+
+.tags-autocomplete-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--foreground);
+  transition: background-color 0.15s;
+}
+
+.tags-autocomplete-item:hover {
+  background-color: var(--accents-1);
+}
+
+.tags-autocomplete-item.create-new {
+  color: var(--accent);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  background-color: rgba(0, 112, 243, 0.03);
+}
+
+.tags-autocomplete-item.create-new:hover {
+  background-color: rgba(0, 112, 243, 0.08);
+}
+
 /* Excel View Layout */
 .excel-filters {
   display: flex;

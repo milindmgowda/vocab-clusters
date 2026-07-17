@@ -3,6 +3,8 @@
 // --- Initialization & Globals ---
 let allWords = [];
 let userProgress = {};
+let activeTags = [];
+let currentWordTags = [];
 
 // Application state
 const state = {
@@ -13,6 +15,7 @@ const state = {
     currentIndex: 0,
     groupFilter: 'All',
     statusFilter: 'All',
+    tagFilter: 'All',
     searchQuery: ''
   },
   // Excel mode state
@@ -20,6 +23,7 @@ const state = {
     filteredWords: [],
     groupFilter: 'All',
     statusFilter: 'All',
+    tagFilter: 'All',
     searchQuery: '',
     selectedWord: null, // Currently selected word for synonym highlighting
     revealedMeanings: new Set(), // Set of words whose meanings are revealed in spreadsheet
@@ -127,9 +131,54 @@ function loadData() {
   }
 
   updateProgressSummary();
+  refreshActiveTags();
   
   // Attempt to sync from cloud (Vercel KV)
   loadCloudProgress();
+}
+
+function refreshActiveTags() {
+  const tagSet = new Set();
+  Object.values(userProgress).forEach(prog => {
+    if (prog && Array.isArray(prog.tags)) {
+      prog.tags.forEach(t => {
+        const cleanTag = t.trim().toLowerCase();
+        if (cleanTag) tagSet.add(cleanTag);
+      });
+    }
+  });
+  activeTags = Array.from(tagSet).sort();
+  updateTagFiltersDropdowns();
+}
+
+function updateTagFiltersDropdowns() {
+  const selects = [
+    document.getElementById('study-tag-filter'),
+    document.getElementById('excel-tag-filter')
+  ].filter(Boolean);
+  
+  selects.forEach(select => {
+    const currentValue = select.value;
+    select.innerHTML = '<option value="All">All Tags</option>';
+    
+    activeTags.forEach(tag => {
+      const opt = document.createElement('option');
+      opt.value = tag;
+      opt.textContent = tag;
+      select.appendChild(opt);
+    });
+    
+    if (activeTags.includes(currentValue)) {
+      select.value = currentValue;
+    } else {
+      select.value = 'All';
+      if (select.id === 'study-tag-filter') {
+        state.study.tagFilter = 'All';
+      } else {
+        state.excel.tagFilter = 'All';
+      }
+    }
+  });
 }
 
 function updateProgressSummary() {
@@ -343,6 +392,13 @@ function applyStudyFilters() {
     if (state.study.statusFilter === 'Defined' && !hasData) return false;
     if (state.study.statusFilter === 'Undefined' && hasData) return false;
     
+    // Tag filter
+    if (state.study.tagFilter !== 'All') {
+      if (!progress || !Array.isArray(progress.tags) || !progress.tags.includes(state.study.tagFilter)) {
+        return false;
+      }
+    }
+    
     // Search query
     if (query) {
       const matchWord = w.word.toLowerCase().includes(query);
@@ -367,7 +423,7 @@ function saveActiveWordFromUI(shouldSync = false) {
   const currentWordObj = state.study.filteredWords[state.study.currentIndex];
   const meaning = document.getElementById('study-meaning').value;
   const synonyms = document.getElementById('study-synonyms').value;
-  saveWordProgress(currentWordObj.word, meaning, synonyms, shouldSync);
+  saveWordProgress(currentWordObj.word, meaning, synonyms, currentWordTags, shouldSync);
 }
 
 function renderStudyWord() {
@@ -382,13 +438,17 @@ function renderStudyWord() {
     `;
     document.getElementById('study-meaning').value = '';
     document.getElementById('study-synonyms').value = '';
+    document.getElementById('study-tags-input').value = '';
+    document.getElementById('study-tags-list').innerHTML = '';
     document.getElementById('study-meaning').disabled = true;
     document.getElementById('study-synonyms').disabled = true;
+    document.getElementById('study-tags-input').disabled = true;
     return;
   }
 
   document.getElementById('study-meaning').disabled = false;
   document.getElementById('study-synonyms').disabled = false;
+  document.getElementById('study-tags-input').disabled = false;
 
   const wordObj = state.study.filteredWords[state.study.currentIndex];
   const progress = userProgress[wordObj.word.toLowerCase()] || { meaning: '', synonyms: '' };
@@ -440,11 +500,46 @@ function renderStudyWord() {
   // Update inputs
   document.getElementById('study-meaning').value = progress.meaning;
   document.getElementById('study-synonyms').value = progress.synonyms;
+  document.getElementById('study-tags-input').value = '';
+
+  // Set current tags
+  currentWordTags = Array.isArray(progress.tags) ? [...progress.tags] : [];
+  renderStudyTagsList();
 
   // Add click listeners to card buttons
   document.getElementById('study-random-btn').addEventListener('click', jumpToRandomWord);
   document.getElementById('study-prev-btn').addEventListener('click', prevWord);
   document.getElementById('study-next-btn').addEventListener('click', nextWord);
+}
+
+function renderStudyTagsList() {
+  const listEl = document.getElementById('study-tags-list');
+  if (!listEl) return;
+
+  listEl.innerHTML = currentWordTags.map(tag => `
+    <span class="tag-badge">
+      <span>${tag}</span>
+      <button class="tag-remove-btn" onclick="removeWordTag('${tag.replace(/'/g, "\\'")}')" title="Remove tag">&times;</button>
+    </span>
+  `).join('');
+}
+
+function addWordTag(tag) {
+  tag = tag.trim().toLowerCase();
+  if (!tag) return;
+
+  if (!currentWordTags.includes(tag)) {
+    currentWordTags.push(tag);
+    renderStudyTagsList();
+    saveActiveWordFromUI(false); // Save locally instantly
+  }
+}
+
+function removeWordTag(tag) {
+  tag = tag.trim().toLowerCase();
+  currentWordTags = currentWordTags.filter(t => t !== tag);
+  renderStudyTagsList();
+  saveActiveWordFromUI(false); // Save locally instantly
 }
 
 function prevWord() {
@@ -548,6 +643,13 @@ function applyExcelFilters() {
     if (state.excel.statusFilter === 'Defined' && !hasData) return false;
     if (state.excel.statusFilter === 'Undefined' && hasData) return false;
     
+    // Tag filter
+    if (state.excel.tagFilter !== 'All') {
+      if (!progress || !Array.isArray(progress.tags) || !progress.tags.includes(state.excel.tagFilter)) {
+        return false;
+      }
+    }
+    
     // Search query
     if (query) {
       const matchWord = w.word.toLowerCase().includes(query);
@@ -584,9 +686,12 @@ function sortExcelWords() {
     } else if (field === 'synonyms') {
       valA = (userProgress[a.word.toLowerCase()]?.synonyms || '').toLowerCase();
       valB = (userProgress[b.word.toLowerCase()]?.synonyms || '').toLowerCase();
+    } else if (field === 'tags') {
+      valA = (userProgress[a.word.toLowerCase()]?.tags || []).join(',').toLowerCase();
+      valB = (userProgress[b.word.toLowerCase()]?.tags || []).join(',').toLowerCase();
     } else if (field === 'status') {
-      const aHas = userProgress[a.word.toLowerCase()] && (userProgress[a.word.toLowerCase()].meaning || userProgress[a.word.toLowerCase()].synonyms);
-      const bHas = userProgress[b.word.toLowerCase()] && (userProgress[b.word.toLowerCase()].meaning || userProgress[b.word.toLowerCase()].synonyms);
+      const aHas = userProgress[a.word.toLowerCase()] && (userProgress[a.word.toLowerCase()].meaning || userProgress[a.word.toLowerCase()].synonyms || userProgress[a.word.toLowerCase()].tags?.length > 0);
+      const bHas = userProgress[b.word.toLowerCase()] && (userProgress[b.word.toLowerCase()].meaning || userProgress[b.word.toLowerCase()].synonyms || userProgress[b.word.toLowerCase()].tags?.length > 0);
       valA = aHas ? 1 : 0;
       valB = bHas ? 1 : 0;
     }
@@ -603,7 +708,7 @@ function renderExcelGrid() {
   if (state.excel.filteredWords.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="empty-state">
+        <td colspan="7" class="empty-state">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -655,8 +760,8 @@ function renderExcelGrid() {
 
   let htmlRows = '';
   state.excel.filteredWords.forEach(w => {
-    const prog = userProgress[w.word.toLowerCase()] || { meaning: '', synonyms: '' };
-    const hasProgress = prog.meaning || prog.synonyms;
+    const prog = userProgress[w.word.toLowerCase()] || { meaning: '', synonyms: '', tags: [] };
+    const hasProgress = prog.meaning || prog.synonyms || (prog.tags && prog.tags.length > 0);
     
     // Highlights
     const isSelected = w.word === selWord;
@@ -691,12 +796,21 @@ function renderExcelGrid() {
         .join('');
     }
 
+    // Tags formatted nicely as purple badges
+    let tagsCellContent = '-';
+    if (prog.tags && prog.tags.length > 0) {
+      tagsCellContent = prog.tags
+        .map(t => `<span class="tag-badge" style="background-color: rgba(168, 85, 247, 0.08); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.15);">${t}</span>`)
+        .join('');
+    }
+
     htmlRows += `
       <tr class="${rowClass}" data-row-word="${w.word}">
         <td class="excel-word-cell" data-word="${w.word}" data-label="Word">${w.word}</td>
         <td style="font-family: var(--font-mono);" data-label="Group">${w.group}</td>
         ${meaningCell}
         <td data-label="Synonyms">${synonymCellContent}</td>
+        <td data-label="Tags">${tagsCellContent}</td>
         <td data-label="Status">${statusBadge}</td>
         <td data-label="Actions">
           <button class="btn btn-secondary excel-edit-btn" data-word="${w.word}" style="height: 28px; padding: 0 10px; font-size: 11px;">
@@ -1055,6 +1169,97 @@ window.addEventListener('DOMContentLoaded', () => {
       select.appendChild(opt);
     });
   });
+
+  // Tag Filter listeners
+  document.getElementById('study-tag-filter').addEventListener('change', (e) => {
+    saveActiveWordFromUI(true);
+    state.study.tagFilter = e.target.value;
+    state.study.currentIndex = 0;
+    applyStudyFilters();
+  });
+
+  document.getElementById('excel-tag-filter').addEventListener('change', (e) => {
+    state.excel.tagFilter = e.target.value;
+    applyExcelFilters();
+  });
+
+  // Autocomplete Tag Input logic
+  const tagsInput = document.getElementById('study-tags-input');
+  const tagsAutocomplete = document.getElementById('study-tags-autocomplete');
+
+  function renderAutocomplete(query) {
+    query = query.toLowerCase().trim();
+    if (!query) {
+      tagsAutocomplete.style.display = 'none';
+      return;
+    }
+
+    // Find matches that aren't already added to the word
+    const matches = activeTags.filter(t => t.includes(query) && !currentWordTags.includes(t));
+    
+    let html = '';
+    const hasExactMatch = activeTags.includes(query) || currentWordTags.includes(query);
+    
+    if (!hasExactMatch) {
+      html += `<div class="tags-autocomplete-item create-new" data-tag="${query}">+ Create "${query}"</div>`;
+    }
+
+    if (matches.length > 0) {
+      matches.forEach(m => {
+        html += `<div class="tags-autocomplete-item" data-tag="${m}">${m}</div>`;
+      });
+    }
+
+    if (html) {
+      tagsAutocomplete.innerHTML = html;
+      tagsAutocomplete.style.display = 'block';
+      
+      // Bind click on items
+      tagsAutocomplete.querySelectorAll('.tags-autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const selectedTag = item.getAttribute('data-tag');
+          addWordTag(selectedTag);
+          tagsInput.value = '';
+          tagsAutocomplete.style.display = 'none';
+          tagsInput.focus();
+        });
+      });
+    } else {
+      tagsAutocomplete.style.display = 'none';
+    }
+  }
+
+  tagsInput.addEventListener('input', (e) => {
+    renderAutocomplete(e.target.value);
+  });
+
+  tagsInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = tagsInput.value.trim().toLowerCase();
+      if (val) {
+        addWordTag(val);
+        tagsInput.value = '';
+        tagsAutocomplete.style.display = 'none';
+      }
+    } else if (e.key === 'Backspace' && tagsInput.value === '') {
+      if (currentWordTags.length > 0) {
+        currentWordTags.pop();
+        renderStudyTagsList();
+        saveActiveWordFromUI(false);
+      }
+    }
+  });
+
+  // Close autocomplete on click outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.tags-input-container')) {
+      tagsAutocomplete.style.display = 'none';
+    }
+  });
+  
+  // Make removeWordTag globally accessible for inline onclick handlers
+  window.removeWordTag = removeWordTag;
 
   // Render initial view
   showView('study');
