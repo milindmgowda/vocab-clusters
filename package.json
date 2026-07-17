@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Vercel-hosted Vocabulary Study Studio",
   "private": true,
+  "dependencies": {
+    "@vercel/blob": "^0.23.4"
+  },
   "engines": {
     "node": ">=18.0.0"
   }

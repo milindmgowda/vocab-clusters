@@ -1,5 +1,7 @@
 // api/progress.js
-// Vercel Serverless Function to Save/Load progress in Vercel KV (Upstash Redis)
+// Vercel Serverless Function to Save/Load progress in Vercel Blob Storage
+
+const { put, list } = require('@vercel/blob');
 
 module.exports = async (req, res) => {
   // Set CORS headers
@@ -16,37 +18,40 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const kvUrl = process.env.KV_REST_API_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN;
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
 
-  // If Vercel KV database is not configured
-  if (!kvUrl || !kvToken) {
+  // If Vercel Blob is not configured
+  if (!token) {
     res.status(200).json({
-      status: 'no_kv_configured',
-      message: 'Vercel KV environment variables are missing. Falling back to local storage.'
+      status: 'no_kv_configured', // We keep 'no_kv_configured' so the frontend client logic doesn't need to change
+      message: 'Vercel Blob storage is missing. Falling back to local storage.'
     });
     return;
   }
 
   try {
     if (req.method === 'GET') {
-      // Fetch progress from KV store
-      const response = await fetch(kvUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${kvToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(['GET', 'vocab_study_progress'])
-      });
+      // List files to find progress.json
+      const { blobs } = await list({ token });
+      const progressBlob = blobs.find(b => b.pathname === 'progress.json');
 
-      if (!response.ok) {
-        throw new Error(`KV REST GET failed with status ${response.status}`);
+      if (!progressBlob) {
+        // First run, file doesn't exist yet
+        res.status(200).json({
+          status: 'success',
+          source: 'cloud',
+          data: {}
+        });
+        return;
       }
 
-      const data = await response.json();
-      // data.result will contain our stringified user progress JSON or null if not set
-      const progress = data.result ? JSON.parse(data.result) : {};
+      // Fetch file content from public URL
+      const fetchResponse = await fetch(progressBlob.url);
+      if (!fetchResponse.ok) {
+        throw new Error(`Failed to fetch blob file content: ${fetchResponse.status}`);
+      }
+      
+      const progress = await fetchResponse.json();
 
       res.status(200).json({
         status: 'success',
@@ -63,24 +68,16 @@ module.exports = async (req, res) => {
         return;
       }
 
-      // Save progress to KV store
-      const progressString = JSON.stringify(progressData);
-      const response = await fetch(kvUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${kvToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(['SET', 'vocab_study_progress', progressString])
+      // Save/Overwrite progress.json in Vercel Blob
+      await put('progress.json', JSON.stringify(progressData), {
+        access: 'public',
+        addRandomSuffix: false,
+        token
       });
-
-      if (!response.ok) {
-        throw new Error(`KV REST SET failed with status ${response.status}`);
-      }
 
       res.status(200).json({
         status: 'success',
-        message: 'Progress saved to Vercel KV successfully.'
+        message: 'Progress saved to Vercel Blob successfully.'
       });
     } 
     else {
