@@ -898,13 +898,43 @@ input:checked + .slider:before {
   }
 }
 
+/* Top Progress Bar Line */
+.top-progress-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--accents-2);
+  z-index: 1001; /* Above header */
+}
+.top-progress-bar {
+  height: 100%;
+  width: 0%;
+  background-color: var(--accent);
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Tab Navigation Icons */
+.tab-icon {
+  margin-right: 8px;
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+}
+
 @media (max-width: 600px) {
   /* Restructure Header for Mobile layout */
   .app-header {
     height: auto;
-    padding: 16px;
+    padding: 16px 16px 12px 16px;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     align-items: stretch;
   }
   
@@ -915,7 +945,7 @@ input:checked + .slider:before {
   }
   
   .header-actions {
-    display: none; /* Hide top theme switch on mobile (we can place it in settings or bottom) */
+    display: none; /* Hide top theme switch on mobile */
   }
 
   /* Fixed Bottom Tab Navigation */
@@ -924,10 +954,10 @@ input:checked + .slider:before {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 56px;
+    height: 58px;
     background-color: var(--background);
     border-top: 1px solid var(--border);
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
     display: flex;
     justify-content: space-around;
     z-index: 1000;
@@ -936,9 +966,18 @@ input:checked + .slider:before {
   .tab-btn {
     flex: 1;
     justify-content: center;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 0;
+    flex-direction: column; /* Stack icon above text on mobile */
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 0;
+    height: 100%;
+  }
+
+  .tab-icon {
+    margin-right: 0;
+    margin-bottom: 4px;
+    width: 18px;
+    height: 18px;
   }
   
   .tab-btn.active::after {
@@ -973,6 +1012,7 @@ input:checked + .slider:before {
   /* Spreadsheet spacing */
   .spreadsheet-container {
     max-height: calc(100vh - 350px);
+    border: none;
   }
   
   /* Touch target sizes */
@@ -983,6 +1023,103 @@ input:checked + .slider:before {
   
   .edit-panel {
     padding: 16px;
+  }
+
+  /* Responsive Table-to-Card Layout */
+  .spreadsheet-table thead {
+    display: none; /* Hide traditional headers */
+  }
+  
+  .spreadsheet-table, 
+  .spreadsheet-table tbody, 
+  .spreadsheet-table tr, 
+  .spreadsheet-table td {
+    display: block;
+    width: 100%;
+  }
+  
+  /* Make each row look like a dashboard card */
+  .spreadsheet-table tr {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background-color: var(--background);
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  
+  .spreadsheet-table tr:hover {
+    border-color: var(--border-hover);
+  }
+  
+  /* Row cells */
+  .spreadsheet-table td {
+    border: none !important;
+    padding: 8px 0 !important;
+    display: flex;
+    align-items: flex-start;
+    min-height: auto;
+    position: static !important; /* Disable deskop sticky columns */
+    box-shadow: none !important;
+    background-color: transparent !important;
+  }
+  
+  /* Inject prefixes dynamically */
+  .spreadsheet-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--accents-4);
+    width: 100px;
+    flex-shrink: 0;
+    padding-top: 2px;
+    letter-spacing: 0.05em;
+  }
+  
+  /* Format first cell (Word) as the card heading */
+  .spreadsheet-table td:first-child {
+    border-bottom: 1px solid var(--border) !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 8px;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  
+  .spreadsheet-table td:first-child::before {
+    display: none; /* Word header doesn't need 'Word' prefix */
+  }
+  
+  /* Synonym pulse matches on mobile cards */
+  .spreadsheet-table tr.synonym-highlight {
+    border-color: var(--highlight-border) !important;
+    background-color: var(--highlight-bg) !important;
+    box-shadow: var(--highlight-glow);
+  }
+  
+  .spreadsheet-table tr.selected-word-row {
+    border-color: var(--foreground) !important;
+    background-color: var(--accents-1) !important;
+  }
+
+  /* Actions container layout */
+  .spreadsheet-table td[data-label="Actions"] {
+    border-top: 1px dashed var(--border) !important;
+    padding-top: 12px !important;
+    margin-top: 8px;
+    justify-content: flex-end;
+  }
+  
+  .spreadsheet-table td[data-label="Actions"]::before {
+    display: none;
+  }
+  
+  .spreadsheet-table td[data-label="Actions"] .btn {
+    width: 100%;
+    height: 38px;
   }
 }
 

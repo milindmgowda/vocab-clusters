@@ -143,6 +143,12 @@ function updateProgressSummary() {
   statsElements.forEach(el => {
     el.innerHTML = `<strong>${definedCount}</strong> / ${allWords.length} words (${percent}%)`;
   });
+
+  // Set top progress bar width
+  const progressBar = document.getElementById('top-progress-bar');
+  if (progressBar) {
+    progressBar.style.width = `${percent}%`;
+  }
 }
 
 // --- Cloud Sync Helpers ---
@@ -660,7 +666,7 @@ function renderExcelGrid() {
     // Meaning Cell rendering (handling blurring)
     const isRevealed = state.excel.revealedMeanings.has(w.word) || !state.excel.studyModeBlurred;
     const meaningText = prog.meaning || '-';
-    const meaningCell = `<td class="excel-meaning-cell ${!isRevealed && prog.meaning ? 'blurred-meaning' : ''}" data-word="${w.word}">
+    const meaningCell = `<td class="excel-meaning-cell ${!isRevealed && prog.meaning ? 'blurred-meaning' : ''}" data-word="${w.word}" data-label="Meaning">
       ${meaningText}
     </td>`;
 
@@ -676,12 +682,12 @@ function renderExcelGrid() {
 
     htmlRows += `
       <tr class="${rowClass}" data-row-word="${w.word}">
-        <td class="excel-word-cell" data-word="${w.word}">${w.word}</td>
-        <td style="font-family: var(--font-mono);">${w.group}</td>
+        <td class="excel-word-cell" data-word="${w.word}" data-label="Word">${w.word}</td>
+        <td style="font-family: var(--font-mono);" data-label="Group">${w.group}</td>
         ${meaningCell}
-        <td>${synonymCellContent}</td>
-        <td>${statusBadge}</td>
-        <td>
+        <td data-label="Synonyms">${synonymCellContent}</td>
+        <td data-label="Status">${statusBadge}</td>
+        <td data-label="Actions">
           <button class="btn btn-secondary excel-edit-btn" data-word="${w.word}" style="height: 28px; padding: 0 10px; font-size: 11px;">
             Edit
           </button>
