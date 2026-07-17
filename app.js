@@ -356,6 +356,59 @@ function saveWordProgress(word, meaning, synonyms, tags = [], sentiment = null, 
 }
 
 // --- View Router ---
+function syncFiltersStudyToExcel() {
+  state.excel.groupFilter = state.study.groupFilter;
+  state.excel.statusFilter = state.study.statusFilter;
+  state.excel.tagFilter = state.study.tagFilter;
+  state.excel.sentimentFilter = state.study.sentimentFilter;
+  state.excel.searchQuery = state.study.searchQuery;
+
+  const eg = document.getElementById('excel-group-filter');
+  const es = document.getElementById('excel-status-filter');
+  const et = document.getElementById('excel-tag-filter');
+  const ec = document.getElementById('excel-sentiment-filter');
+  const ei = document.getElementById('excel-search-input');
+
+  if (eg) eg.value = state.study.groupFilter;
+  if (es) es.value = state.study.statusFilter;
+  if (et) et.value = state.study.tagFilter;
+  if (ec) ec.value = state.study.sentimentFilter;
+  if (ei) ei.value = state.study.searchQuery;
+}
+
+function syncFiltersExcelToStudy() {
+  state.study.groupFilter = state.excel.groupFilter;
+  state.study.statusFilter = state.excel.statusFilter;
+  state.study.tagFilter = state.excel.tagFilter;
+  state.study.sentimentFilter = state.excel.sentimentFilter;
+  state.study.searchQuery = state.excel.searchQuery;
+
+  const sg = document.getElementById('study-group-filter');
+  const ss = document.getElementById('study-status-filter');
+  const st = document.getElementById('study-tag-filter');
+  const sc = document.getElementById('study-sentiment-filter');
+  const si = document.getElementById('study-search-input');
+
+  if (sg) sg.value = state.excel.groupFilter;
+  if (ss) ss.value = state.excel.statusFilter;
+  if (st) st.value = state.excel.tagFilter;
+  if (sc) sc.value = state.excel.sentimentFilter;
+  if (si) si.value = state.excel.searchQuery;
+}
+
+function onStudyFilterChange() {
+  syncFiltersStudyToExcel();
+  applyStudyFilters();
+  applyExcelFilters();
+}
+
+function onExcelFilterChange() {
+  syncFiltersExcelToStudy();
+  state.excel.selectedWord = null;
+  applyExcelFilters();
+  applyStudyFilters();
+}
+
 function showView(viewName) {
   state.currentView = viewName;
   
@@ -373,6 +426,15 @@ function showView(viewName) {
     applyStudyFilters();
   } else if (viewName === 'excel') {
     applyExcelFilters();
+    // Auto scroll to selected word row in spreadsheet
+    if (state.excel.selectedWord) {
+      setTimeout(() => {
+        const row = document.querySelector(`[data-row-word="${state.excel.selectedWord}"]`);
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 120);
+    }
   }
 }
 
@@ -382,6 +444,20 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     // Save current active word progress before leaving study view
     if (state.currentView === 'study') {
       saveActiveWordFromUI(true);
+      
+      const currentWordObj = state.study.filteredWords[state.study.currentIndex];
+      state.excel.selectedWord = currentWordObj ? currentWordObj.word : null;
+      syncFiltersStudyToExcel();
+    } else if (state.currentView === 'excel') {
+      syncFiltersExcelToStudy();
+      
+      if (state.excel.selectedWord) {
+        applyStudyFilters(); // populate study list first to find index
+        const idx = state.study.filteredWords.findIndex(w => w.word.toLowerCase() === state.excel.selectedWord.toLowerCase());
+        if (idx !== -1) {
+          state.study.currentIndex = idx;
+        }
+      }
     }
     showView(viewName);
   });
@@ -642,21 +718,21 @@ document.getElementById('study-group-filter').addEventListener('change', (e) => 
   saveActiveWordFromUI(true);
   state.study.groupFilter = e.target.value;
   state.study.currentIndex = 0;
-  applyStudyFilters();
+  onStudyFilterChange();
 });
 
 document.getElementById('study-status-filter').addEventListener('change', (e) => {
   saveActiveWordFromUI(true);
   state.study.statusFilter = e.target.value;
   state.study.currentIndex = 0;
-  applyStudyFilters();
+  onStudyFilterChange();
 });
 
 document.getElementById('study-search-input').addEventListener('input', (e) => {
   saveActiveWordFromUI(false); // Typing in search should not trigger cloud sync
   state.study.searchQuery = e.target.value;
   state.study.currentIndex = 0;
-  applyStudyFilters();
+  onStudyFilterChange();
 });
 
 // --- Excel View Logic ---
@@ -1048,20 +1124,17 @@ document.querySelectorAll('.spreadsheet-table th[data-sort]').forEach(th => {
 // Grid Filters Event Listeners
 document.getElementById('excel-group-filter').addEventListener('change', (e) => {
   state.excel.groupFilter = e.target.value;
-  state.excel.selectedWord = null; // Clear active synonym highlight on filter change
-  applyExcelFilters();
+  onExcelFilterChange();
 });
 
 document.getElementById('excel-status-filter').addEventListener('change', (e) => {
   state.excel.statusFilter = e.target.value;
-  state.excel.selectedWord = null;
-  applyExcelFilters();
+  onExcelFilterChange();
 });
 
 document.getElementById('excel-search-input').addEventListener('input', (e) => {
   state.excel.searchQuery = e.target.value;
-  state.excel.selectedWord = null;
-  applyExcelFilters();
+  onExcelFilterChange();
 });
 
 // Blurred study switch toggle
@@ -1290,12 +1363,12 @@ window.addEventListener('DOMContentLoaded', () => {
     saveActiveWordFromUI(true);
     state.study.tagFilter = e.target.value;
     state.study.currentIndex = 0;
-    applyStudyFilters();
+    onStudyFilterChange();
   });
 
   document.getElementById('excel-tag-filter').addEventListener('change', (e) => {
     state.excel.tagFilter = e.target.value;
-    applyExcelFilters();
+    onExcelFilterChange();
   });
 
   // Sentiment/Connotation Filter listeners
@@ -1303,12 +1376,12 @@ window.addEventListener('DOMContentLoaded', () => {
     saveActiveWordFromUI(true);
     state.study.sentimentFilter = e.target.value;
     state.study.currentIndex = 0;
-    applyStudyFilters();
+    onStudyFilterChange();
   });
 
   document.getElementById('excel-sentiment-filter').addEventListener('change', (e) => {
     state.excel.sentimentFilter = e.target.value;
-    applyExcelFilters();
+    onExcelFilterChange();
   });
 
   // Segmented Connotation Button click listeners
