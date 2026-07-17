@@ -255,11 +255,14 @@ function triggerCloudSync() {
   }, 1200); // 1.2s delay to prevent spamming
 }
 
-function saveWordProgress(word, meaning, synonyms) {
+function saveWordProgress(word, meaning, synonyms, shouldSync = false) {
   if (!word) return;
 
   meaning = meaning.trim();
   synonyms = synonyms.trim();
+
+  const prevProg = userProgress[word];
+  const hasChanged = !prevProg || prevProg.meaning !== meaning || prevProg.synonyms !== synonyms;
 
   if (!meaning && !synonyms) {
     delete userProgress[word];
@@ -269,7 +272,10 @@ function saveWordProgress(word, meaning, synonyms) {
 
   localStorage.setItem('vocab_study_progress', JSON.stringify(userProgress));
   updateProgressSummary();
-  triggerCloudSync();
+  
+  if (shouldSync && hasChanged) {
+    triggerCloudSync();
+  }
 }
 
 // --- View Router ---
@@ -298,7 +304,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const viewName = btn.getAttribute('data-view');
     // Save current active word progress before leaving study view
     if (state.currentView === 'study') {
-      saveActiveWordFromUI();
+      saveActiveWordFromUI(true);
     }
     showView(viewName);
   });
@@ -339,12 +345,12 @@ function applyStudyFilters() {
   renderStudyWord();
 }
 
-function saveActiveWordFromUI() {
+function saveActiveWordFromUI(shouldSync = false) {
   if (state.study.filteredWords.length === 0) return;
   const currentWordObj = state.study.filteredWords[state.study.currentIndex];
   const meaning = document.getElementById('study-meaning').value;
   const synonyms = document.getElementById('study-synonyms').value;
-  saveWordProgress(currentWordObj.word, meaning, synonyms);
+  saveWordProgress(currentWordObj.word, meaning, synonyms, shouldSync);
 }
 
 function renderStudyWord() {
@@ -426,21 +432,21 @@ function renderStudyWord() {
 
 function prevWord() {
   if (state.study.filteredWords.length === 0) return;
-  saveActiveWordFromUI();
+  saveActiveWordFromUI(true);
   state.study.currentIndex = (state.study.currentIndex - 1 + state.study.filteredWords.length) % state.study.filteredWords.length;
   renderStudyWord();
 }
 
 function nextWord() {
   if (state.study.filteredWords.length === 0) return;
-  saveActiveWordFromUI();
+  saveActiveWordFromUI(true);
   state.study.currentIndex = (state.study.currentIndex + 1) % state.study.filteredWords.length;
   renderStudyWord();
 }
 
 function jumpToRandomWord() {
   if (state.study.filteredWords.length <= 1) return;
-  saveActiveWordFromUI();
+  saveActiveWordFromUI(true);
   let rand;
   do {
     rand = Math.floor(Math.random() * state.study.filteredWords.length);
@@ -463,7 +469,7 @@ const debounceSave = (func, delay = 500) => {
 
 const autosaveFields = debounceSave(() => {
   if (state.study.filteredWords.length > 0) {
-    saveActiveWordFromUI();
+    saveActiveWordFromUI(false); // Local save only on typing
     // Update card defined/undefined pill visually without redraw
     const currentWordObj = state.study.filteredWords[state.study.currentIndex];
     const progress = userProgress[currentWordObj.word] || { meaning: '', synonyms: '' };
@@ -479,23 +485,31 @@ const autosaveFields = debounceSave(() => {
 document.getElementById('study-meaning').addEventListener('input', autosaveFields);
 document.getElementById('study-synonyms').addEventListener('input', autosaveFields);
 
+// Sync on blur (losing focus)
+document.getElementById('study-meaning').addEventListener('blur', () => {
+  saveActiveWordFromUI(true);
+});
+document.getElementById('study-synonyms').addEventListener('blur', () => {
+  saveActiveWordFromUI(true);
+});
+
 // Filter Event Listeners (Study Mode)
 document.getElementById('study-group-filter').addEventListener('change', (e) => {
-  saveActiveWordFromUI();
+  saveActiveWordFromUI(true);
   state.study.groupFilter = e.target.value;
   state.study.currentIndex = 0;
   applyStudyFilters();
 });
 
 document.getElementById('study-status-filter').addEventListener('change', (e) => {
-  saveActiveWordFromUI();
+  saveActiveWordFromUI(true);
   state.study.statusFilter = e.target.value;
   state.study.currentIndex = 0;
   applyStudyFilters();
 });
 
 document.getElementById('study-search-input').addEventListener('input', (e) => {
-  saveActiveWordFromUI();
+  saveActiveWordFromUI(false); // Typing in search should not trigger cloud sync
   state.study.searchQuery = e.target.value;
   state.study.currentIndex = 0;
   applyStudyFilters();
@@ -898,7 +912,7 @@ document.addEventListener('keydown', (e) => {
   if (isEditing) {
     if (e.ctrlKey && e.key === 'Enter') {
       e.preventDefault();
-      saveActiveWordFromUI();
+      saveActiveWordFromUI(true);
       document.activeElement.blur();
       showToast('Progress saved!');
     }
