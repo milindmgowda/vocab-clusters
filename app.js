@@ -7,6 +7,11 @@ let activeTags = [];
 let currentWordTags = [];
 let currentWordSentiment = null;
 
+// Modal edit state
+let modalWord = '';
+let modalWordTags = [];
+let modalWordSentiment = null;
+
 // Application state
 const state = {
   currentView: 'study',
@@ -894,9 +899,69 @@ function renderExcelGrid() {
   tbody.querySelectorAll('.excel-edit-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const clickedWord = btn.getAttribute('data-word');
-      jumpToEditWord(clickedWord);
+      openEditModal(clickedWord);
     });
   });
+}
+
+function openEditModal(word) {
+  modalWord = word;
+  const progress = userProgress[word.toLowerCase()] || { meaning: '', synonyms: '', tags: [], sentiment: null };
+
+  document.getElementById('modal-word-title').textContent = word;
+  document.getElementById('modal-meaning').value = progress.meaning || '';
+  document.getElementById('modal-synonyms').value = progress.synonyms || '';
+  document.getElementById('modal-tags-input').value = '';
+
+  modalWordTags = Array.isArray(progress.tags) ? [...progress.tags] : [];
+  renderModalTagsList();
+
+  modalWordSentiment = progress.sentiment || null;
+  document.querySelectorAll('#modal-sentiment-group .sentiment-btn').forEach(btn => {
+    const s = btn.getAttribute('data-sentiment');
+    if (s === modalWordSentiment) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  modalWord = '';
+  modalWordTags = [];
+  modalWordSentiment = null;
+}
+
+function renderModalTagsList() {
+  const listEl = document.getElementById('modal-tags-list');
+  if (!listEl) return;
+
+  listEl.innerHTML = modalWordTags.map(tag => `
+    <span class="tag-badge">
+      <span>${tag}</span>
+      <button class="tag-remove-btn" onclick="removeModalWordTag('${tag.replace(/'/g, "\\'")}')" title="Remove tag">&times;</button>
+    </span>
+  `).join('');
+}
+
+function addModalWordTag(tag) {
+  tag = tag.trim().toLowerCase();
+  if (!tag) return;
+
+  if (!modalWordTags.includes(tag)) {
+    modalWordTags.push(tag);
+    renderModalTagsList();
+  }
+}
+
+function removeModalWordTag(tag) {
+  tag = tag.trim().toLowerCase();
+  modalWordTags = modalWordTags.filter(t => t !== tag);
+  renderModalTagsList();
 }
 
 function handleWordCellClick(word) {
@@ -1335,8 +1400,119 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  // Make removeWordTag globally accessible for inline onclick handlers
+  // Modal Close/Cancel events
+  document.getElementById('modal-close-btn').addEventListener('click', closeEditModal);
+  document.getElementById('modal-cancel-btn').addEventListener('click', closeEditModal);
+  document.getElementById('edit-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'edit-modal') {
+      closeEditModal();
+    }
+  });
+
+  // Modal Sentiment toggles
+  document.querySelectorAll('#modal-sentiment-group .sentiment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const selected = btn.getAttribute('data-sentiment');
+      if (modalWordSentiment === selected) {
+        modalWordSentiment = null;
+        btn.classList.remove('active');
+      } else {
+        document.querySelectorAll('#modal-sentiment-group .sentiment-btn').forEach(b => b.classList.remove('active'));
+        modalWordSentiment = selected;
+        btn.classList.add('active');
+      }
+    });
+  });
+
+  // Modal Autocomplete Tag logic
+  const modalTagsInput = document.getElementById('modal-tags-input');
+  const modalTagsAutocomplete = document.getElementById('modal-tags-autocomplete');
+
+  function renderModalAutocomplete(query) {
+    query = query.toLowerCase().trim();
+    if (!query) {
+      modalTagsAutocomplete.style.display = 'none';
+      return;
+    }
+
+    const matches = activeTags.filter(t => t.includes(query) && !modalWordTags.includes(t));
+    let html = '';
+    const hasExactMatch = activeTags.includes(query) || modalWordTags.includes(query);
+    
+    if (!hasExactMatch) {
+      html += `<div class="tags-autocomplete-item create-new" data-tag="${query}">+ Create "${query}"</div>`;
+    }
+
+    if (matches.length > 0) {
+      matches.forEach(m => {
+        html += `<div class="tags-autocomplete-item" data-tag="${m}">${m}</div>`;
+      });
+    }
+
+    if (html) {
+      modalTagsAutocomplete.innerHTML = html;
+      modalTagsAutocomplete.style.display = 'block';
+      
+      modalTagsAutocomplete.querySelectorAll('.tags-autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const selectedTag = item.getAttribute('data-tag');
+          addModalWordTag(selectedTag);
+          modalTagsInput.value = '';
+          modalTagsAutocomplete.style.display = 'none';
+          modalTagsInput.focus();
+        });
+      });
+    } else {
+      modalTagsAutocomplete.style.display = 'none';
+    }
+  }
+
+  modalTagsInput.addEventListener('input', (e) => {
+    renderModalAutocomplete(e.target.value);
+  });
+
+  modalTagsInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = modalTagsInput.value.trim().toLowerCase();
+      if (val) {
+        addModalWordTag(val);
+        modalTagsInput.value = '';
+        modalTagsAutocomplete.style.display = 'none';
+      }
+    } else if (e.key === 'Backspace' && modalTagsInput.value === '') {
+      if (modalWordTags.length > 0) {
+        modalWordTags.pop();
+        renderModalTagsList();
+      }
+    }
+  });
+
+  // Modal Save Changes event
+  document.getElementById('modal-save-btn').addEventListener('click', () => {
+    if (!modalWord) return;
+    const meaning = document.getElementById('modal-meaning').value;
+    const synonyms = document.getElementById('modal-synonyms').value;
+    
+    // Save to userProgress and cloud
+    saveWordProgress(modalWord, meaning, synonyms, modalWordTags, modalWordSentiment, true);
+    
+    // Update local state if the currently displayed study card is this word
+    if (state.study.filteredWords.length > 0) {
+      const currentStudyWord = state.study.filteredWords[state.study.currentIndex];
+      if (currentStudyWord && currentStudyWord.word.toLowerCase() === modalWord.toLowerCase()) {
+        renderStudyWord();
+      }
+    }
+
+    renderExcelGrid();
+    closeEditModal();
+    showToast(`Saved changes for: "${modalWord}"`);
+  });
+
+  // Make removeWordTag and removeModalWordTag globally accessible for inline onclick handlers
   window.removeWordTag = removeWordTag;
+  window.removeModalWordTag = removeModalWordTag;
 
   // Render initial view
   showView('study');

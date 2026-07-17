@@ -298,6 +298,51 @@
     <button class="toast-close-btn" id="toast-close" aria-label="Close Toast">×</button>
   </div>
 
+  <!-- Edit Word Modal Overlay (Excel Inline Edit) -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit Word: <span id="modal-word-title" style="font-weight: 800; color: var(--foreground);">word</span></h3>
+        <button class="modal-close-btn" id="modal-close-btn" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="modal-meaning" style="font-size: 12px; font-weight: 600; color: var(--accents-5);">Meaning / Definition</label>
+          <textarea class="form-textarea" id="modal-meaning" placeholder="Write the meaning of the word here..."></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="modal-synonyms" style="font-size: 12px; font-weight: 600; color: var(--accents-5);">Synonyms (Comma-separated)</label>
+          <input type="text" class="form-input" id="modal-synonyms" placeholder="e.g. abundant, plentiful, generic">
+        </div>
+
+        <div class="form-group">
+          <label for="modal-tags-input" style="font-size: 12px; font-weight: 600; color: var(--accents-5);">Tags</label>
+          <div class="tags-manager">
+            <div class="tags-list" id="modal-tags-list"></div>
+            <div class="tags-input-container">
+              <input type="text" class="form-input" id="modal-tags-input" placeholder="Search or type a new tag..." autocomplete="off">
+              <div class="tags-autocomplete" id="modal-tags-autocomplete"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 12px; font-weight: 600; color: var(--accents-5);">Word Charge / Connotation</label>
+          <div class="sentiment-group" id="modal-sentiment-group">
+            <button class="btn sentiment-btn pos" data-sentiment="positive" type="button">Positive (+)</button>
+            <button class="btn sentiment-btn neu" data-sentiment="neutral" type="button">Neutral (=)</button>
+            <button class="btn sentiment-btn neg" data-sentiment="negative" type="button">Negative (-)</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-cancel-btn" style="height: 38px;">Cancel</button>
+        <button class="btn btn-primary" id="modal-save-btn" style="height: 38px;">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Load Data and Logic scripts -->
   <script src="words.js"></script>
   <script src="app.js"></script>
