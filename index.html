@@ -309,20 +309,13 @@
     <section class="view-section" id="game-view">
       
       <!-- Game header options -->
-      <div class="controls-bar game-controls-bar">
-        <div class="control-group" style="width: 180px; margin: 0;">
-          <label for="game-group-filter">Select Group</label>
-          <select class="form-select" id="game-group-filter">
-            <!-- Injected dynamically via JS -->
-          </select>
-        </div>
-        
-        <button class="btn btn-primary" id="game-start-btn" style="height: 42px; padding: 0 20px; font-weight: 700;" type="button">
-          Start New Game
+      <div class="controls-bar game-controls-bar" style="display: flex; justify-content: center; gap: 16px; align-items: center;">
+        <button class="btn btn-primary" id="game-start-btn" style="height: 42px; padding: 0 24px; font-weight: 700;" type="button">
+          Start Synonym Quiz
         </button>
 
         <div class="game-status-text" id="game-status-text" style="font-size: 13px; color: var(--accents-4); line-height: 1.4;">
-          Group words into synonym clusters based on your definitions. Select a group and click Start!
+          Test your studied synonyms across the entire vocabulary list! Click start to begin the quiz.
         </div>
       </div>
 
@@ -370,9 +363,9 @@
           <line x1="12" y1="8" x2="12" y2="12"></line>
           <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
-        <h4 style="font-size: 16px; font-weight: 700; color: var(--foreground); margin-bottom: 6px;">No Synonym Clusters Defined</h4>
+        <h4 style="font-size: 16px; font-weight: 700; color: var(--foreground); margin-bottom: 6px;">No Synonyms Defined</h4>
         <p style="font-size: 13px; color: var(--accents-4); max-width: 400px; margin: 0 auto 16px auto;">
-          You need to record synonyms for words inside this group first before you can play! Use Study Mode or Excel View to connect words together.
+          You need to record synonyms for words first before you can play! Use Study Mode or Excel View to connect words together.
         </p>
       </div>
 

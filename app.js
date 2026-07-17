@@ -446,10 +446,6 @@ function showView(viewName) {
       }, 120);
     }
   } else if (viewName === 'game') {
-    const activeGroup = state.study.groupFilter !== 'All' ? state.study.groupFilter : 'Group 1';
-    state.game.groupFilter = activeGroup;
-    const gameSel = document.getElementById('game-group-filter');
-    if (gameSel) gameSel.value = activeGroup;
     startNewGame();
   }
 }
@@ -474,12 +470,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
           state.study.currentIndex = idx;
         }
       }
-    } else if (state.currentView === 'game') {
-      // Sync game group selection back to study and excel filters
-      state.study.groupFilter = state.game.groupFilter;
-      const studyGroupSel = document.getElementById('study-group-filter');
-      if (studyGroupSel) studyGroupSel.value = state.game.groupFilter;
-      syncFiltersStudyToExcel();
     }
     showView(viewName);
   });
@@ -1342,24 +1332,21 @@ function generateDynamicIcon() {
 
 // --- Game Mode Logic ---
 
-function computeQuizWords(groupName) {
-  // Get all words in the group
-  const groupWords = allWords.filter(w => w.group === groupName).map(w => w.word.toLowerCase());
-  
-  // Find words that have synonyms defined that belong to the same group or vocabulary list
+function computeQuizWords() {
   const testable = [];
-  groupWords.forEach(w => {
-    const progress = userProgress[w];
+  allWords.forEach(w => {
+    const wordKey = w.word.toLowerCase();
+    const progress = userProgress[wordKey];
     if (!progress || !progress.synonyms) return;
 
     const synList = progress.synonyms
       .split(',')
       .map(s => s.trim().toLowerCase())
-      .filter(s => s && s !== w);
+      .filter(s => s && s !== wordKey);
 
     if (synList.length > 0) {
       testable.push({
-        word: w,
+        word: wordKey,
         synonyms: synList
       });
     }
@@ -1369,8 +1356,7 @@ function computeQuizWords(groupName) {
 }
 
 function startNewGame() {
-  const group = state.game.groupFilter;
-  const testable = computeQuizWords(group);
+  const testable = computeQuizWords();
 
   if (testable.length === 0) {
     document.getElementById('game-container').style.display = 'none';
@@ -1428,7 +1414,7 @@ function startNewGame() {
   state.game.score = 0;
 
   loadQuizRound();
-  showToast(`Quiz game started for ${group}!`);
+  showToast(`Global synonym quiz started!`);
 }
 
 function loadQuizRound() {
@@ -1459,12 +1445,12 @@ function loadQuizRound() {
   });
   state.game.correctAnswers = correctCased;
 
-  // Gather distractors: random words from the same group that are not the target or correct synonyms
-  const groupWords = allWords.filter(w => w.group === state.game.groupFilter).map(w => w.word);
+  // Gather distractors: random words from the entire dataset that are not the target or correct synonyms
+  const allGlobalWords = allWords.map(w => w.word);
   const correctLower = correctRaw.map(s => s.toLowerCase());
   correctLower.push(targetWord.toLowerCase());
   
-  const distractors = groupWords
+  const distractors = allGlobalWords
     .filter(w => !correctLower.includes(w.toLowerCase()))
     .sort(() => Math.random() - 0.5)
     .slice(0, 6); // choose up to 6 distractors
@@ -1715,17 +1701,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Game Group dropdown (no 'All Groups' option)
-  const gameGroupSelect = document.getElementById('game-group-filter');
-  if (gameGroupSelect) {
-    gameGroupSelect.innerHTML = '';
-    sortedGroups.forEach(groupName => {
-      const opt = document.createElement('option');
-      opt.value = groupName;
-      opt.textContent = groupName;
-      gameGroupSelect.appendChild(opt);
-    });
-  }
+
 
   // Tag Filter listeners
   document.getElementById('study-tag-filter').addEventListener('change', (e) => {
@@ -1964,10 +1940,7 @@ window.addEventListener('DOMContentLoaded', () => {
   initSynonymsAutocomplete('study-synonyms', 'study-synonyms-autocomplete');
   initSynonymsAutocomplete('modal-synonyms', 'modal-synonyms-autocomplete');
 
-  // Game Mode controls
-  document.getElementById('game-group-filter').addEventListener('change', (e) => {
-    state.game.groupFilter = e.target.value;
-  });
+
 
   document.getElementById('game-start-btn').addEventListener('click', startNewGame);
   
