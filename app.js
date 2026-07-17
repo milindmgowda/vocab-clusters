@@ -939,10 +939,71 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// --- Dynamic PWA Icon Generation (SVG to PNG base64) ---
+function generateDynamicIcon() {
+  const svgString = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+      <defs>
+        <radialGradient id="bg-grad" cx="50%" cy="50%" r="70%">
+          <stop offset="0%" stop-color="#1c1c1e" />
+          <stop offset="100%" stop-color="#000000" />
+        </radialGradient>
+        <linearGradient id="neon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#a855f7" />
+          <stop offset="50%" stop-color="#6366f1" />
+          <stop offset="100%" stop-color="#3b82f6" />
+        </linearGradient>
+      </defs>
+      <rect width="512" height="512" rx="120" fill="url(#bg-grad)" stroke="#222" stroke-width="6" />
+      <circle cx="256" cy="256" r="236" fill="none" stroke="url(#neon-grad)" stroke-width="2" opacity="0.3" />
+      <path d="M150 180 C 150 140, 200 130, 256 160 C 312 130, 362 140, 362 180 L 362 380 C 362 340, 312 330, 256 360 C 200 330, 150 340, 150 380 Z" fill="none" stroke="url(#neon-grad)" stroke-width="16" stroke-linejoin="round" />
+      <line x1="256" y1="160" x2="256" y2="360" stroke="url(#neon-grad)" stroke-width="16" stroke-linecap="round" />
+      <path d="M190 200 L256 310 L322 200" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  `;
+
+  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.width = 180;
+  img.height = 180;
+  
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 180;
+    canvas.height = 180;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, 180, 180);
+    
+    try {
+      const pngUrl = canvas.toDataURL('image/png');
+      
+      // Update apple touch icon dynamically
+      let appleTouchLink = document.querySelector('link[rel="apple-touch-icon"]');
+      if (appleTouchLink) {
+        appleTouchLink.href = pngUrl;
+      }
+      
+      // Update favicon dynamically
+      let faviconLink = document.querySelector('link[rel="icon"]');
+      if (faviconLink) {
+        faviconLink.href = pngUrl;
+      }
+    } catch (e) {
+      console.warn('Canvas toDataURL failed (local file context?), fallback to static SVG', e);
+    }
+    
+    URL.revokeObjectURL(url);
+  };
+  
+  img.src = url;
+}
+
 // --- App Load Event ---
 window.addEventListener('DOMContentLoaded', () => {
   initTheme();
   loadData();
+  generateDynamicIcon();
   
   // Register Service Worker for PWA (Offline capability)
   if ('serviceWorker' in navigator) {
