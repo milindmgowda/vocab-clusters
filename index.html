@@ -326,63 +326,41 @@
         </div>
       </div>
 
-      <!-- Game Main Workspace -->
+      <!-- Game Main Quiz Container -->
       <div class="game-container" id="game-container" style="display: none; margin-top: 20px;">
         
-        <!-- Score Bar -->
-        <div class="game-score-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background-color: var(--accents-1); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px;">
-          <div style="font-weight: 700; font-size: 14px;">
-            🔍 Synonym Clusters Found: <span id="game-score" style="color: #a855f7;">0 / 0</span>
+        <div class="game-quiz-card" style="max-width: 600px; margin: 0 auto; background-color: var(--background); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); overflow: hidden; padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+          
+          <!-- Score and Progress -->
+          <div class="quiz-score-header" style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--accents-4); border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+            <div>Group Quiz Progress: <span id="game-round-progress" style="color: var(--foreground); font-weight: 700;">Word 0 of 0</span></div>
+            <div>Score: <span id="game-score" style="color: #10b981; font-weight: 700;">0</span></div>
           </div>
-          <div style="font-weight: 600; font-size: 13px; color: var(--accents-4);">
-            Words Remaining: <span id="game-remaining-words" style="color: var(--foreground);">0</span>
+
+          <!-- Target Word Display -->
+          <div class="quiz-target-section" style="text-align: center; padding: 10px 0;">
+            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--accents-4); letter-spacing: 0.05em;">Find the synonyms for</span>
+            <h2 id="game-target-word" style="font-size: 34px; font-weight: 800; color: #a855f7; margin: 8px 0; letter-spacing: -0.03em;">target</h2>
+            <div id="game-hint-text" style="font-size: 13px; color: var(--accents-5); min-height: 20px; font-style: italic; margin-top: 6px;"></div>
           </div>
-          <button class="btn btn-secondary" id="game-hint-btn" style="height: 28px; padding: 0 12px; font-size: 11px;" type="button">
-            Reveal Hint
-          </button>
+
+          <!-- Options Grid -->
+          <div class="quiz-options-section">
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accents-4); display: block; margin-bottom: 10px; letter-spacing: 0.05em;">Options (Select all that apply)</span>
+            <div class="game-options-grid" id="game-options-container" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+              <!-- Option buttons are injected via JS -->
+            </div>
+          </div>
+
+          <!-- Controls Buttons -->
+          <div class="quiz-controls-section" style="display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 10px;">
+            <button class="btn btn-secondary" id="game-hint-btn" style="flex: 1; height: 42px;" type="button">Hint (Meaning)</button>
+            <button class="btn btn-secondary" id="game-skip-btn" style="flex: 1; height: 42px;" type="button">Skip Word</button>
+            <button class="btn btn-primary" id="game-submit-btn" style="flex: 2; height: 42px; font-weight: 700;" type="button">Verify Guess</button>
+          </div>
+
         </div>
 
-        <div class="game-play-grid">
-          <!-- Word Pool (Left Pane) -->
-          <div class="game-panel-card">
-            <h4>Word Pool</h4>
-            <p class="panel-subtitle">Click words that are synonyms of each other to cluster them.</p>
-            <div class="game-word-pool-container" id="game-word-pool">
-              <!-- Draggable/clickable word badges injected via JS -->
-            </div>
-          </div>
-
-          <!-- Guess / Active Workspace (Center Pane) -->
-          <div class="game-panel-card workspace-panel">
-            <h4>Current Guess Cluster</h4>
-            <p class="panel-subtitle">Group of selected synonyms.</p>
-            
-            <div class="game-guess-workspace" id="game-guess-workspace">
-              <!-- Selected words shown here -->
-              <div class="empty-workspace-state" id="empty-workspace-state">
-                Select words from the pool to build a synonym cluster.
-              </div>
-            </div>
-
-            <div class="workspace-buttons" style="display: flex; gap: 10px; margin-top: 16px;">
-              <button class="btn btn-secondary" id="game-clear-btn" style="flex: 1; height: 38px;" type="button">
-                Clear
-              </button>
-              <button class="btn btn-primary" id="game-submit-btn" style="flex: 2; height: 38px; font-weight: 700;" type="button">
-                Verify synonym Cluster
-              </button>
-            </div>
-          </div>
-
-          <!-- Found Clusters List (Right Pane) -->
-          <div class="game-panel-card">
-            <h4>Correct Clusters Found</h4>
-            <p class="panel-subtitle">Successfully grouped word clusters.</p>
-            <div class="game-found-clusters-container" id="game-found-clusters">
-              <!-- Successfully grouped lists shown here -->
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- No Clusters defined fallback -->

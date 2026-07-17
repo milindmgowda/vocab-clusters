@@ -42,10 +42,12 @@ const state = {
   // Game Mode state
   game: {
     groupFilter: 'Group 1',
-    targetClusters: [], // Array of arrays of synonym words
-    foundClusters: [], // Array of arrays of successfully found clusters
-    activeSelection: [], // Words currently selected in guess
-    allPoolWords: [] // Pre-filtered list of words belonging to a cluster
+    testableWords: [],   // Shuffled array of lowercased target words
+    currentWordIndex: 0, // Target word index
+    correctAnswers: [],  // Correct synonyms in the current round
+    userSelection: [],   // Selected option strings
+    score: 0,            // Solved counts
+    options: []          // Shuffled pool array of options (strings)
   }
 };
 
@@ -1340,256 +1342,270 @@ function generateDynamicIcon() {
 
 // --- Game Mode Logic ---
 
-function computeSynonymClusters(groupName) {
+function computeQuizWords(groupName) {
   // Get all words in the group
   const groupWords = allWords.filter(w => w.group === groupName).map(w => w.word.toLowerCase());
-  if (groupWords.length === 0) return [];
-
-  // Build adjacency list for synonyms graph
-  const adj = {};
-  groupWords.forEach(w => {
-    adj[w] = new Set();
-  });
-
-  // Extract relations
+  
+  // Find words that have synonyms defined that belong to the same group or vocabulary list
+  const testable = [];
   groupWords.forEach(w => {
     const progress = userProgress[w];
-    if (!progress) return;
+    if (!progress || !progress.synonyms) return;
 
-    // Direct synonyms from progress
     const synList = progress.synonyms
-      ? progress.synonyms.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
-      : [];
+      .split(',')
+      .map(s => s.trim().toLowerCase())
+      .filter(s => s && s !== w);
 
-    synList.forEach(s => {
-      // If the synonym is in the same group, draw an edge
-      if (groupWords.includes(s)) {
-        adj[w].add(s);
-        adj[s].add(w);
-      }
-      
-      // Secondary check: find other words in the same group that have the same synonym
-      groupWords.forEach(other => {
-        if (other === w) return;
-        const otherProg = userProgress[other];
-        if (!otherProg) return;
-        const otherSyns = otherProg.synonyms
-          ? otherProg.synonyms.split(',').map(sy => sy.trim().toLowerCase()).filter(Boolean)
-          : [];
-        if (otherSyns.includes(s)) {
-          adj[w].add(other);
-          adj[other].add(w);
-        }
+    if (synList.length > 0) {
+      testable.push({
+        word: w,
+        synonyms: synList
       });
-    });
-  });
-
-  // Connected components solver (DFS)
-  const visited = new Set();
-  const clusters = [];
-
-  groupWords.forEach(w => {
-    if (visited.has(w)) return;
-
-    const component = [];
-    const queue = [w];
-    visited.add(w);
-
-    while (queue.length > 0) {
-      const curr = queue.shift();
-      component.push(curr);
-
-      adj[curr].forEach(neighbor => {
-        if (!visited.has(neighbor)) {
-          visited.add(neighbor);
-          queue.push(neighbor);
-        }
-      });
-    }
-
-    // Only keep components of size >= 2 (clusters)
-    // Also, only keep if at least one word has some progress (otherwise it's just group singletons)
-    const hasProgressWord = component.some(word => {
-      const p = userProgress[word];
-      return p && (p.meaning || p.synonyms);
-    });
-
-    if (component.length >= 2 && hasProgressWord) {
-      // Map back to original case
-      const originalCasedComp = component.map(lc => {
-        const found = allWords.find(wordObj => wordObj.word.toLowerCase() === lc);
-        return found ? found.word : lc;
-      });
-      clusters.push(originalCasedComp);
     }
   });
 
-  return clusters;
+  return testable;
 }
 
 function startNewGame() {
   const group = state.game.groupFilter;
-  const clusters = computeSynonymClusters(group);
+  const testable = computeQuizWords(group);
 
-  if (clusters.length === 0) {
+  if (testable.length === 0) {
     document.getElementById('game-container').style.display = 'none';
     document.getElementById('game-empty-state-fallback').style.display = 'block';
     return;
   }
 
+  // Restore container HTML structure if it was overwritten by victory screen
+  const container = document.getElementById('game-container');
+  container.innerHTML = `
+    <div class="game-quiz-card" style="max-width: 600px; margin: 0 auto; background-color: var(--background); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); overflow: hidden; padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+      
+      <!-- Score and Progress -->
+      <div class="quiz-score-header" style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--accents-4); border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+        <div>Group Quiz Progress: <span id="game-round-progress" style="color: var(--foreground); font-weight: 700;">Word 0 of 0</span></div>
+        <div>Score: <span id="game-score" style="color: #10b981; font-weight: 700;">0</span></div>
+      </div>
+
+      <!-- Target Word Display -->
+      <div class="quiz-target-section" style="text-align: center; padding: 10px 0;">
+        <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--accents-4); letter-spacing: 0.05em;">Find the synonyms for</span>
+        <h2 id="game-target-word" style="font-size: 34px; font-weight: 800; color: #a855f7; margin: 8px 0; letter-spacing: -0.03em;">target</h2>
+        <div id="game-hint-text" style="font-size: 13px; color: var(--accents-5); min-height: 20px; font-style: italic; margin-top: 6px;"></div>
+      </div>
+
+      <!-- Options Grid -->
+      <div class="quiz-options-section">
+        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accents-4); display: block; margin-bottom: 10px; letter-spacing: 0.05em;">Options (Select all that apply)</span>
+        <div class="game-options-grid" id="game-options-container" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <!-- Option buttons are injected via JS -->
+        </div>
+      </div>
+
+      <!-- Controls Buttons -->
+      <div class="quiz-controls-section" style="display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 10px;">
+        <button class="btn btn-secondary" id="game-hint-btn" style="flex: 1; height: 42px;" type="button">Hint (Meaning)</button>
+        <button class="btn btn-secondary" id="game-skip-btn" style="flex: 1; height: 42px;" type="button">Skip Word</button>
+        <button class="btn btn-primary" id="game-submit-btn" style="flex: 2; height: 42px; font-weight: 700;" type="button">Verify Guess</button>
+      </div>
+
+    </div>
+  `;
+
+  // Re-bind dynamically injected controls button listeners
+  document.getElementById('game-hint-btn').addEventListener('click', revealQuizHint);
+  document.getElementById('game-skip-btn').addEventListener('click', skipQuizWord);
+  document.getElementById('game-submit-btn').addEventListener('click', verifyQuizGuess);
+
   document.getElementById('game-empty-state-fallback').style.display = 'none';
   document.getElementById('game-container').style.display = 'block';
 
-  // Set game state
-  state.game.targetClusters = clusters.map(c => [...c]); // copy array contents
-  state.game.foundClusters = [];
-  state.game.activeSelection = [];
-  
-  // pool words are all unique words inside target clusters
-  const poolSet = new Set();
-  clusters.forEach(c => c.forEach(w => poolSet.add(w)));
-  // convert set to array and shuffle
-  state.game.allPoolWords = Array.from(poolSet).sort(() => Math.random() - 0.5);
+  // Shuffle testable target words
+  state.game.testableWords = testable.sort(() => Math.random() - 0.5);
+  state.game.currentWordIndex = 0;
+  state.game.score = 0;
 
-  renderGameBoard();
-  showToast(`New game started for ${group}!`);
+  loadQuizRound();
+  showToast(`Quiz game started for ${group}!`);
 }
 
-function renderGameBoard() {
-  const scoreEl = document.getElementById('game-score');
-  const remainingEl = document.getElementById('game-remaining-words');
-  const poolEl = document.getElementById('game-word-pool');
-  const workspaceEl = document.getElementById('game-guess-workspace');
-  const foundEl = document.getElementById('game-found-clusters');
-
-  const totalClusters = state.game.targetClusters.length + state.game.foundClusters.length;
-  scoreEl.textContent = `${state.game.foundClusters.length} / ${totalClusters}`;
-
-  // Count remaining words in target clusters
-  const remSet = new Set();
-  state.game.targetClusters.forEach(c => c.forEach(w => remSet.add(w)));
-  remainingEl.textContent = remSet.size;
-
-  // Render pool words
-  if (remSet.size === 0) {
-    poolEl.innerHTML = `<div style="font-size: 13px; color: #10b981; font-weight: 700; width: 100%; text-align: center; padding: 20px 0;">🎉 Congratulations! You found all synonym clusters!</div>`;
-  } else {
-    // only show words that haven't been found yet
-    poolEl.innerHTML = state.game.allPoolWords
-      .filter(w => remSet.has(w))
-      .map(w => {
-        const isSelected = state.game.activeSelection.includes(w);
-        return `<span class="game-word-card ${isSelected ? 'selected' : ''}" onclick="toggleWordSelection('${w.replace(/'/g, "\\'")}')">${w}</span>`;
-      }).join('');
-  }
-
-  // Render guess workspace
-  if (state.game.activeSelection.length === 0) {
-    workspaceEl.innerHTML = `<div class="empty-workspace-state" id="empty-workspace-state">Select words from the pool to build a synonym cluster.</div>`;
-  } else {
-    workspaceEl.innerHTML = state.game.activeSelection
-      .map(w => `<span class="game-word-card selected" onclick="toggleWordSelection('${w.replace(/'/g, "\\'")}')">${w}</span>`)
-      .join('');
-  }
-
-  // Render found clusters list
-  if (state.game.foundClusters.length === 0) {
-    foundEl.innerHTML = `<div style="font-size: 12px; color: var(--accents-3); text-align: center; padding: 20px 0;">No clusters found yet. Guess correctly to unlock them!</div>`;
-  } else {
-    foundEl.innerHTML = state.game.foundClusters.map((c, index) => `
-      <div class="found-cluster-card">
-        <div class="found-cluster-title">Cluster ${index + 1}</div>
-        <div class="found-cluster-words">
-          ${c.map(w => `<span class="tag-badge" style="background-color: rgba(16, 185, 129, 0.08); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.15); font-weight: 600;">${w}</span>`).join('')}
-        </div>
-      </div>
-    `).join('');
-  }
-}
-
-function toggleWordSelection(word) {
-  const index = state.game.activeSelection.indexOf(word);
-  if (index === -1) {
-    state.game.activeSelection.push(word);
-  } else {
-    state.game.activeSelection.splice(index, 1);
-  }
-  renderGameBoard();
-}
-
-function verifyActiveClusterGuess() {
-  const active = state.game.activeSelection;
-  if (active.length < 2) {
-    showToast('A synonym cluster must contain at least 2 words!');
+function loadQuizRound() {
+  const idx = state.game.currentWordIndex;
+  if (idx >= state.game.testableWords.length) {
+    showVictoryScreen();
     return;
   }
 
-  // Check if active matches any of the target clusters (order-independent)
-  const activeSorted = [...active].sort().map(w => w.toLowerCase());
+  const roundData = state.game.testableWords[idx];
+  const targetWord = roundData.word;
+  
+  // Map back target word to original casing
+  const originalWordObj = allWords.find(w => w.word.toLowerCase() === targetWord);
+  const targetCased = originalWordObj ? originalWordObj.word : targetWord;
 
-  let foundIndex = -1;
-  for (let i = 0; i < state.game.targetClusters.length; i++) {
-    const targetSorted = [...state.game.targetClusters[i]].sort().map(w => w.toLowerCase());
-    if (activeSorted.length === targetSorted.length && activeSorted.every((w, idx) => w === targetSorted[idx])) {
-      foundIndex = i;
-      break;
-    }
-  }
+  // Clear selections
+  state.game.userSelection = [];
+  const hintTextEl = document.getElementById('game-hint-text');
+  if (hintTextEl) hintTextEl.textContent = '';
 
-  const workspaceEl = document.getElementById('game-guess-workspace');
+  // Correct answers are synonyms defined for this word
+  const correctRaw = roundData.synonyms;
+  // Make sure we resolve original cased word strings for options
+  const correctCased = correctRaw.map(lc => {
+    const found = allWords.find(w => w.word.toLowerCase() === lc);
+    return found ? found.word : lc;
+  });
+  state.game.correctAnswers = correctCased;
 
-  if (foundIndex !== -1) {
-    // Correct guess!
-    const matchedCluster = state.game.targetClusters.splice(foundIndex, 1)[0];
-    state.game.foundClusters.push(matchedCluster);
-    state.game.activeSelection = [];
+  // Gather distractors: random words from the same group that are not the target or correct synonyms
+  const groupWords = allWords.filter(w => w.group === state.game.groupFilter).map(w => w.word);
+  const correctLower = correctRaw.map(s => s.toLowerCase());
+  correctLower.push(targetWord.toLowerCase());
+  
+  const distractors = groupWords
+    .filter(w => !correctLower.includes(w.toLowerCase()))
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 6); // choose up to 6 distractors
 
-    // Success styling feedback
-    workspaceEl.classList.add('workspace-success');
-    setTimeout(() => {
-      workspaceEl.classList.remove('workspace-success');
-      renderGameBoard();
-    }, 400);
+  // Combine options (correct answers + distractors) and shuffle
+  const allOptions = Array.from(new Set([...correctCased, ...distractors])).sort(() => Math.random() - 0.5);
+  state.game.options = allOptions;
 
-    showToast('Correct synonym cluster!');
+  // Render elements
+  document.getElementById('game-target-word').textContent = targetCased;
+  document.getElementById('game-round-progress').textContent = `Word ${idx + 1} of ${state.game.testableWords.length}`;
+  document.getElementById('game-score').textContent = state.game.score;
+
+  renderQuizOptions();
+}
+
+function renderQuizOptions() {
+  const optionsEl = document.getElementById('game-options-container');
+  if (!optionsEl) return;
+
+  optionsEl.innerHTML = state.game.options.map(option => {
+    const isSelected = state.game.userSelection.includes(option);
+    return `
+      <div class="game-option-btn ${isSelected ? 'selected' : ''}" 
+           onclick="toggleOptionSelection('${option.replace(/'/g, "\\'")}')">
+        ${option}
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleOptionSelection(word) {
+  const index = state.game.userSelection.indexOf(word);
+  if (index === -1) {
+    state.game.userSelection.push(word);
   } else {
-    // Incorrect guess
-    workspaceEl.classList.add('workspace-shake');
-    // Highlight items as mismatched
-    document.querySelectorAll('#game-guess-workspace .game-word-card').forEach(card => {
-      card.classList.add('mismatched');
+    state.game.userSelection.splice(index, 1);
+  }
+  renderQuizOptions();
+}
+
+function verifyQuizGuess() {
+  const selected = state.game.userSelection;
+  const correct = state.game.correctAnswers;
+
+  // To be correct, selected set must equal correct answers that exist in options pool
+  const correctInPool = correct.filter(w => state.game.options.includes(w));
+  
+  const selectedSorted = [...selected].sort().map(s => s.toLowerCase());
+  const correctSorted = [...correctInPool].sort().map(c => c.toLowerCase());
+
+  const quizCard = document.querySelector('.game-quiz-card');
+
+  if (selectedSorted.length === correctSorted.length && selectedSorted.every((val, i) => val === correctSorted[i])) {
+    // CORRECT GUESS
+    state.game.score += 1;
+    document.getElementById('game-score').textContent = state.game.score;
+
+    // Highlight correct answers in green
+    document.querySelectorAll('.game-option-btn').forEach(btn => {
+      const txt = btn.textContent.trim();
+      if (correctInPool.includes(txt)) {
+        btn.classList.add('correct-reveal');
+      }
+    });
+
+    showToast('Correct! Moving to next word...');
+
+    setTimeout(() => {
+      state.game.currentWordIndex += 1;
+      loadQuizRound();
+    }, 1200);
+  } else {
+    // INCORRECT GUESS
+    quizCard.classList.add('shake');
+    
+    // Highlight incorrect selections in red, correct in green
+    document.querySelectorAll('.game-option-btn').forEach(btn => {
+      const txt = btn.textContent.trim();
+      const isUserSelected = selected.includes(txt);
+      const isCorrect = correctInPool.includes(txt);
+
+      if (isUserSelected && !isCorrect) {
+        btn.classList.add('incorrect-reveal');
+      } else if (isCorrect) {
+        btn.classList.add('correct-reveal');
+      }
     });
 
     setTimeout(() => {
-      workspaceEl.classList.remove('workspace-shake');
-      // remove mismatched
-      document.querySelectorAll('#game-guess-workspace .game-word-card').forEach(card => {
-        card.classList.remove('mismatched');
+      quizCard.classList.remove('shake');
+      document.querySelectorAll('.game-option-btn').forEach(btn => {
+        btn.classList.remove('incorrect-reveal', 'correct-reveal');
       });
-      // Return cards to pool
-      state.game.activeSelection = [];
-      renderGameBoard();
-    }, 600);
+    }, 1500);
 
-    showToast('Incorrect synonym cluster. Try again!');
+    showToast('Incorrect selections. Review highlights and try again!');
   }
 }
 
-function revealGameHint() {
-  if (state.game.targetClusters.length === 0) return;
+function revealQuizHint() {
+  const idx = state.game.currentWordIndex;
+  if (idx >= state.game.testableWords.length) return;
 
-  // Grab first remaining target cluster
-  const cluster = state.game.targetClusters[0];
-  // Reveal the meaning of one word in that cluster
-  const word = cluster[0];
-  const progress = userProgress[word.toLowerCase()];
-  const meaningHint = progress && progress.meaning ? progress.meaning : 'no definition recorded yet';
+  const targetWord = state.game.testableWords[idx].word;
+  const progress = userProgress[targetWord];
+  const meaning = progress && progress.meaning ? progress.meaning : 'No meaning defined';
 
-  showToast(`Hint: The meaning of one cluster word "${word}" is: "${meaningHint}"`, 6000);
+  const hintEl = document.getElementById('game-hint-text');
+  if (hintEl) {
+    hintEl.textContent = `Definition hint: ${meaning}`;
+  }
 }
 
-// Make globally accessible
-window.toggleWordSelection = toggleWordSelection;
+function skipQuizWord() {
+  showToast('Word skipped.');
+  state.game.currentWordIndex += 1;
+  loadQuizRound();
+}
+
+function showVictoryScreen() {
+  const container = document.getElementById('game-container');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="game-quiz-card" style="max-width: 600px; margin: 0 auto; background-color: var(--background); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); padding: 40px 24px; text-align: center; display: flex; flex-direction: column; gap: 20px; align-items: center;">
+      <div style="font-size: 50px;">🏆</div>
+      <h2 style="font-size: 26px; font-weight: 800; color: var(--foreground); margin: 0;">Quiz Completed!</h2>
+      <p style="font-size: 15px; color: var(--accents-4); margin: 0 0 10px 0;">
+        You solved <span style="font-weight: 800; color: #10b981;">${state.game.score}</span> out of <span style="font-weight: 800; color: var(--foreground);">${state.game.testableWords.length}</span> rounds inside ${state.game.groupFilter}!
+      </p>
+      <button class="btn btn-primary" style="height: 42px; padding: 0 24px; font-weight: 700;" onclick="startNewGame()">
+        Play Again
+      </button>
+    </div>
+  `;
+}
+
+// Bind globally for inline triggers
+window.toggleOptionSelection = toggleOptionSelection;
+window.startNewGame = startNewGame;
 
 function initSynonymsAutocomplete(inputId, autocompleteId) {
   const inputEl = document.getElementById(inputId);
@@ -1955,17 +1971,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('game-start-btn').addEventListener('click', startNewGame);
   
-  document.getElementById('game-clear-btn').addEventListener('click', () => {
-    state.game.activeSelection = [];
-    renderGameBoard();
-  });
-
-  document.getElementById('game-submit-btn').addEventListener('click', verifyActiveClusterGuess);
-  document.getElementById('game-hint-btn').addEventListener('click', revealGameHint);
-
   // Make removeWordTag and removeModalWordTag globally accessible for inline onclick handlers
-  window.removeWordTag = removeWordTag;
-  window.removeModalWordTag = removeModalWordTag;
   window.removeWordTag = removeWordTag;
   window.removeModalWordTag = removeModalWordTag;
 
