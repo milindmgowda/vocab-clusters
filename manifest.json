@@ -1,0 +1,18 @@
+{
+  "short_name": "VocabStudio",
+  "name": "GRE Vocabulary Study Studio",
+  "description": "Premium Vercel-style Vocabulary Study App with cloud and offline sync.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["education", "utilities"],
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
