@@ -1,0 +1,9 @@
+{
+  "name": "gre-vocab-study-studio",
+  "version": "1.0.0",
+  "description": "Vercel-hosted Vocabulary Study Studio",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

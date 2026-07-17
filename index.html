@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>GRE Vocab Study Studio</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <h1>VocabStudy <span>Studio</span></h1>
+      <div class="progress-summary">
+        <span>Progress:</span>
+        <span class="progress-stat-value"><strong>0</strong> / 0 words</span>
+      </div>
+      <div class="sync-indicator" id="sync-indicator" title="Sync Status"></div>
+    </div>
+    
+    <!-- View Switch Tabs -->
+    <nav class="header-tabs" aria-label="Main Navigation">
+      <button class="tab-btn active" data-view="study" id="tab-study">Study Mode</button>
+      <button class="tab-btn" data-view="excel" id="tab-excel">Excel View</button>
+    </nav>
+    
+    <div class="header-actions">
+      <!-- Dark/Light Theme Button -->
+      <button class="theme-toggle-btn" id="theme-toggle" title="Toggle Theme" aria-label="Toggle Theme">
+        <!-- Icon is injected via app.js -->
+      </button>
+    </div>
+  </header>
+
+  <main class="app-container">
+    
+    <!-- SECTION 1: STUDY MODE -->
+    <section class="view-section active" id="study-view">
+      
+      <!-- Filters and Navigation bar -->
+      <div class="controls-bar">
+        <div class="control-group">
+          <label for="study-group-filter">Jump to Group</label>
+          <select class="form-select" id="study-group-filter">
+            <option value="All">All Groups</option>
+            <!-- Injected dynamically via JS -->
+          </select>
+        </div>
+        
+        <div class="control-group">
+          <label for="study-status-filter">Status</label>
+          <select class="form-select" id="study-status-filter">
+            <option value="All">All Words</option>
+            <option value="Defined">Defined Words</option>
+            <option value="Undefined">Undefined Words</option>
+          </select>
+        </div>
+        
+        <div class="control-group">
+          <label for="study-search-input">Search Word / Meaning</label>
+          <div class="search-wrapper">
+            <input type="search" class="form-input" id="study-search-input" placeholder="Type to search...">
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Study Screen Grid -->
+      <div class="study-grid">
+        <!-- Interactive Card (Left Column) -->
+        <div id="study-card-wrapper">
+          <!-- Card markup is generated dynamically via app.js -->
+        </div>
+
+        <!-- Meaning & Synonyms Input Form (Right Column) -->
+        <div class="edit-panel">
+          <h3>Record Meaning & Synonyms</h3>
+          
+          <div class="form-group">
+            <label for="study-meaning">Meaning / Definition</label>
+            <textarea class="form-textarea" id="study-meaning" placeholder="Write the meaning of the word here..."></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label for="study-synonyms">Synonyms (Comma-separated)</label>
+            <input type="text" class="form-input" id="study-synonyms" placeholder="e.g. abundant, plentiful, generic">
+            <p style="font-size: 11px; color: var(--accents-4); margin-top: 4px;">
+              Separate synonyms with commas. When using the Excel sheet, clicking a word highlights its synonyms!
+            </p>
+          </div>
+
+          <!-- Shortcuts -->
+          <div class="shortcuts-legend">
+            <div class="shortcut-item">
+              <span class="shortcut-key">→</span> or <span class="shortcut-key">Enter</span>
+              <span>Next word</span>
+            </div>
+            <div class="shortcut-item">
+              <span class="shortcut-key">←</span>
+              <span>Prev word</span>
+            </div>
+            <div class="shortcut-item">
+              <span class="shortcut-key">R</span>
+              <span>Random word</span>
+            </div>
+            <div class="shortcut-item">
+              <span class="shortcut-key">Ctrl + Enter</span>
+              <span>Save & exit input</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: EXCEL VIEW -->
+    <section class="view-section" id="excel-view">
+      
+      <!-- Excel Search and Settings -->
+      <div class="excel-filters">
+        <div class="excel-filters-left">
+          <div class="control-group" style="width: 180px;">
+            <label for="excel-group-filter">Filter Group</label>
+            <select class="form-select" id="excel-group-filter">
+              <option value="All">All Groups</option>
+              <!-- Injected dynamically via JS -->
+            </select>
+          </div>
+          
+          <div class="control-group" style="width: 180px;">
+            <label for="excel-status-filter">Status</label>
+            <select class="form-select" id="excel-status-filter">
+              <option value="All">All Words</option>
+              <option value="Defined">Defined Words</option>
+              <option value="Undefined">Undefined Words</option>
+            </select>
+          </div>
+          
+          <div class="control-group" style="width: 260px;">
+            <label for="excel-search-input">Search Spreadsheet</label>
+            <input type="search" class="form-input" id="excel-search-input" placeholder="Search words or meanings...">
+          </div>
+        </div>
+
+        <div class="excel-filters-right">
+          <!-- Study blurred mode toggle -->
+          <label class="toggle-switch-container" title="Blur meanings in spreadsheet for flashcard study">
+            <span class="switch">
+              <input type="checkbox" id="study-mode-toggle" checked>
+              <span class="slider"></span>
+            </span>
+            <span>Study Mode (Blur Meanings)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Excel Spreadsheet Table -->
+      <div class="spreadsheet-container" tabindex="0">
+        <table class="spreadsheet-table" id="excel-table">
+          <thead>
+            <tr>
+              <th data-sort="word" style="width: 20%; cursor: pointer;">Word</th>
+              <th data-sort="group" style="width: 15%; cursor: pointer;">Group ▲</th>
+              <th data-sort="meaning" style="width: 35%; cursor: pointer;">Meaning</th>
+              <th data-sort="synonyms" style="width: 18%; cursor: pointer;">Synonyms</th>
+              <th data-sort="status" style="width: 12%; cursor: pointer;">Status</th>
+              <th style="width: 10%;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="excel-tbody">
+            <!-- Table content is loaded dynamically via app.js -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Backup Settings -->
+      <div class="settings-section">
+        <div class="settings-card">
+          <div class="settings-info">
+            <h4>Backup & Persistence Management</h4>
+            <p>Export your recorded meanings and synonyms to a file or import them back to restore progress.</p>
+          </div>
+          <div class="settings-actions">
+            <button class="btn btn-secondary" id="backup-export-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Export JSON
+            </button>
+            <label class="btn btn-secondary" style="margin: 0; cursor: pointer; display: inline-flex; align-items: center;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              Import JSON
+              <input type="file" id="backup-import-file" accept=".json" style="display: none;">
+            </label>
+            <button class="btn btn-secondary" id="settings-reset-btn" style="color: var(--status-undefined-text);">
+              Reset All Progress
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Notification -->
+  <div class="toast-notification" id="toast-notification" role="alert" aria-live="assertive">
+    <span id="toast-text">Word saved successfully!</span>
+    <button class="toast-close-btn" id="toast-close" aria-label="Close Toast">×</button>
+  </div>
+
+  <!-- Load Data and Logic scripts -->
+  <script src="words.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
